@@ -700,7 +700,9 @@ const Game = () => {
                 alert('Firebase 연결 성공! 콘솔을 확인하세요.');
             } catch (e) {
                 console.error('테스트 문서 추가 실패:', e);
-                alert('Firebase 연결 실패: ' + e.message);
+                console.error('오류 코드:', e.code);
+                console.error('오류 세부 정보:', e.details);
+                alert('Firebase 연결 실패: ' + e.message + '\n\n자세한 내용은 콘솔을 확인하세요.');
             }
         };
         

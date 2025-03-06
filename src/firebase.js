@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -18,10 +18,25 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+let app;
+let db;
 
-// Initialize Firestore
-const db = getFirestore(app);
+try {
+  app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+
+  // Initialize Firestore
+  db = getFirestore(app);
+  
+  console.log("Firebase 초기화 성공");
+} catch (error) {
+  console.error("Firebase 초기화 오류:", error);
+}
+
+// 개발 환경에서 Firestore 에뮬레이터 연결 (선택 사항)
+// if (process.env.NODE_ENV === 'development') {
+//   connectFirestoreEmulator(db, 'localhost', 8080);
+//   console.log('Firestore 에뮬레이터에 연결됨');
+// }
 
 export { db };
