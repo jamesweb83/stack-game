@@ -4,6 +4,7 @@ import './Game.css';
 import { db, initialized } from '../firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { saveRanking, getRankings, getPlayerRank } from './RankingService';
+import { initOnlineUsers, subscribeToOnlineUsers, unsubscribeFromOnlineUsers } from '../firebase';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -15,6 +16,8 @@ const Game = () => {
     const [gameStarted, setGameStarted] = useState(false);
     const [rankings, setRankings] = useState([]);
     const [playerRank, setPlayerRank] = useState(null);
+    const [topScore, setTopScore] = useState(0);
+    const [onlineUsers, setOnlineUsers] = useState(0);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -47,6 +50,8 @@ const Game = () => {
     
     // 컴포넌트 마운트 시 랭킹 데이터 로드
     useEffect(() => {
+        console.log('Component mounted');
+        
         const loadRankings = async () => {
             try {
                 console.log('Loading ranking data from Firebase...');
@@ -63,11 +68,24 @@ const Game = () => {
             }
         };
         
-        // 기존 데이터로 리더보드 표시
-        loadRankings();
+        // 접속자 수 초기화 및 구독 추가
+        const initializeOnlineUsers = async () => {
+            try {
+                await initOnlineUsers();
+                subscribeToOnlineUsers((count) => {
+                    setOnlineUsers(count);
+                });
+            } catch (error) {
+                console.error('Error initializing online users:', error);
+            }
+        };
         
+        loadRankings();
+        initializeOnlineUsers();
+        
+        // 컴포넌트 언마운트시 접속자 수 구독 해제
         return () => {
-            // 클린업 코드
+            unsubscribeFromOnlineUsers();
         };
     }, []);
     
@@ -799,6 +817,9 @@ const Game = () => {
                     {/* 랭킹 보드 */}
                     <div className="ranking-board">
                         <h2>TOP 30 Ranking</h2>
+                        <div className="online-users">
+                            <span className="online-icon">👥</span> {onlineUsers} 명 접속중
+                        </div>
                         {console.log('Rendering ranking board')}
                         <div className="ranking-list">
                             {displayRankings.length === 0 ? (

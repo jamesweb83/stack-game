@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator, doc, setDoc, onSnapshot, getDoc, updateDoc, increment } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -24,6 +24,7 @@ let initialized = false;
 let app;
 let db;
 let analytics;
+let onlineUsersUnsubscribe = null;
 
 try {
   console.log('Starting Firebase initialization...');
@@ -48,6 +49,79 @@ try {
   console.error("Error stack:", error.stack);
   initialized = false;
 }
+
+// 접속자 수 관리 함수
+export const initOnlineUsers = async () => {
+  if (!initialized || !db) {
+    console.error('Firebase DB is not initialized.');
+    return null;
+  }
+
+  try {
+    // 'stats' 컬렉션의 'onlineUsers' 문서 참조
+    const statsRef = doc(db, 'stats', 'onlineUsers');
+    
+    // 문서가 존재하는지 확인
+    const docSnap = await getDoc(statsRef);
+    
+    if (!docSnap.exists()) {
+      // 문서가 없으면 초기화
+      await setDoc(statsRef, { count: 0 });
+    }
+    
+    // 접속자 수 증가
+    await updateDoc(statsRef, {
+      count: increment(1)
+    });
+    
+    // 브라우저가 닫히거나 페이지를 떠날 때 접속자 수 감소
+    window.addEventListener('beforeunload', async () => {
+      await updateDoc(statsRef, {
+        count: increment(-1)
+      });
+    });
+    
+    return statsRef;
+  } catch (error) {
+    console.error('Error initializing online users count:', error);
+    return null;
+  }
+};
+
+// 접속자 수 구독 함수
+export const subscribeToOnlineUsers = (callback) => {
+  if (!initialized || !db) {
+    console.error('Firebase DB is not initialized.');
+    return () => {};
+  }
+
+  try {
+    const statsRef = doc(db, 'stats', 'onlineUsers');
+    
+    // 실시간 업데이트 구독
+    onlineUsersUnsubscribe = onSnapshot(statsRef, (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        callback(data.count || 0);
+      } else {
+        callback(0);
+      }
+    });
+    
+    return onlineUsersUnsubscribe;
+  } catch (error) {
+    console.error('Error subscribing to online users count:', error);
+    return () => {};
+  }
+};
+
+// 구독 해제 함수
+export const unsubscribeFromOnlineUsers = () => {
+  if (onlineUsersUnsubscribe) {
+    onlineUsersUnsubscribe();
+    onlineUsersUnsubscribe = null;
+  }
+};
 
 // 개발 환경에서 Firestore 에뮬레이터 연결 (선택 사항)
 // if (process.env.NODE_ENV === 'development') {
