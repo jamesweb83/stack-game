@@ -8,6 +8,8 @@ const Game = () => {
     const [score, setScore] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [playerId, setPlayerId] = useState('');
+    const [gameStarted, setGameStarted] = useState(false);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -409,6 +411,9 @@ const Game = () => {
         // 게임 오버 상태가 변경되면 초기화 슘
         if (gameOver) return;
         
+        // 게임이 시작되지 않았으면 초기화하지 않음
+        if (!gameStarted) return;
+        
         // 지연 후 초기화 시도
         const initTimer = setTimeout(() => {
             if (canvasRef.current && containerRef.current && !isInitialized) {
@@ -420,7 +425,7 @@ const Game = () => {
         return () => {
             clearTimeout(initTimer);
         };
-    }, [gameOver, initGame, isInitialized]);
+    }, [gameOver, initGame, isInitialized, gameStarted]);
     
     // 이벤트 리스너 및 게임 정리
     useEffect(() => {
@@ -482,10 +487,27 @@ const Game = () => {
         };
     }, [gameOver, dropObject, cleanupGame]);
     
+    // 게임 시작 함수
+    const startGame = () => {
+        if (!playerId.trim()) {
+            alert('아이디를 입력해주세요!');
+            return;
+        }
+        
+        setGameStarted(true);
+        setScore(0);
+        setGameOver(false);
+    }
+    
     // 게임 재시작 함수
     const restartGame = useCallback(() => {
         // 게임 정리 후 초기화
         cleanupGame();
+        
+        // 게임 상태 초기화
+        setGameStarted(true);
+        setScore(0);
+        setGameOver(false);
         
         // 약간의 지연 후 초기화
         setTimeout(() => {
@@ -495,26 +517,50 @@ const Game = () => {
 
     return (
         <div className="game-container" ref={containerRef}>
-            <canvas ref={canvasRef} />
-            <div className="score">점수: {score}</div>
-            <button 
-                className="drop-btn" 
-                onClick={dropObject}
-                disabled={gameOver || !currentObjectRef.current || !currentObjectRef.current.isStatic}
-            >
-                떨어뜨리기
-            </button>
-            {gameOver && (
-                <div className="game-over">
-                    <h1>게임 오버!</h1>
-                    <p className="final-score">최종 점수: {score}</p>
-                    <button 
-                        className="restart-btn" 
-                        onClick={restartGame}
-                    >
-                        다시 시작
-                    </button>
+            {!gameStarted ? (
+                <div className="start-screen">
+                    <h1>높이 쌓기 게임</h1>
+                    <div className="input-container">
+                        <input 
+                            type="text" 
+                            placeholder="아이디를 입력하세요" 
+                            value={playerId}
+                            onChange={(e) => setPlayerId(e.target.value)}
+                            maxLength={15}
+                        />
+                        <button 
+                            className="start-btn"
+                            onClick={startGame}
+                        >
+                            시작하기
+                        </button>
+                    </div>
                 </div>
+            ) : (
+                <>
+                    <canvas ref={canvasRef} />
+                    <div className="score">점수: {score}</div>
+                    <button 
+                        className="drop-btn" 
+                        onClick={dropObject}
+                        disabled={gameOver || !currentObjectRef.current || !currentObjectRef.current.isStatic}
+                    >
+                        떨어뜨리기
+                    </button>
+                    {gameOver && (
+                        <div className="game-over">
+                            <h1>게임 오버!</h1>
+                            <p className="player-id">플레이어: {playerId}</p>
+                            <p className="final-score">최종 점수: {score}</p>
+                            <button 
+                                className="restart-btn" 
+                                onClick={restartGame}
+                            >
+                                다시 시작
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
