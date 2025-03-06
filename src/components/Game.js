@@ -38,7 +38,8 @@ const Game = () => {
     // useMemo로 objectShapes 메모이제이션 - 사각형만 사용
     const objectShapes = useMemo(() => ['rectangle'], []);
     
-    const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도를 원래 값인 0.3으로 복원
+    // 기울기 종료 조건 제거로 인해 불필요
+    // const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도
     
     // 표시할 랭킹 목록 메모이제이션
     const displayRankings = useMemo(() => {
@@ -158,13 +159,6 @@ const Game = () => {
     const updateScore = useCallback(() => {
         setScore(prevScore => {
             const newScore = prevScore + 1;
-            
-            // 난이도 점진적 증가
-            if (newScore > 5) {
-                platformAngleToleranceRef.current = 0.3 - (newScore * 0.01);
-                // 최소 허용 각도 제한
-                if (platformAngleToleranceRef.current < 0.05) platformAngleToleranceRef.current = 0.05;
-            }
             
             return newScore;
         });
@@ -383,14 +377,6 @@ const Game = () => {
                     body.position.y > renderRef.current.options.height + 100) {
                     endGame();
                     return;
-                }
-                
-                // 받침대 각도 확인
-                if (body.label === 'platform') {
-                    if (Math.abs(body.angle) > platformAngleToleranceRef.current) {
-                        endGame();
-                        return;
-                    }
                 }
             }
         });
