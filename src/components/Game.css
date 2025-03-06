@@ -27,9 +27,23 @@ canvas {
     left: 0;
     width: 100%;
     text-align: center;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
-    color: #333;
+    color: #2c3e50;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 8px 15px;
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.score span {
+    display: inline-block;
+    margin: 0 5px;
 }
 
 .game-over {
@@ -300,8 +314,16 @@ canvas {
 
 @media (max-width: 768px) {
     .score {
-        font-size: 20px;
+        font-size: 16px; /* 모바일에서는 더 작게 */
         top: 10px;
+        padding: 6px 12px;
+        flex-direction: column; /* 모바일에서는 세로로 배치 */
+        align-items: center;
+        max-width: 250px;
+    }
+    
+    .score span {
+        margin: 2px 0;
     }
     
     .game-over h1 {

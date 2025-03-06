@@ -791,7 +791,10 @@ const Game = () => {
             ) : (
                 <>
                     <canvas ref={canvasRef} />
-                    <div className="score">Player: {playerId} Score: {score}</div>
+                    <div className="score">
+                        <span>Player: {playerId}</span>
+                        <span>Score: {score}</span>
+                    </div>
                     <button 
                         className="drop-btn" 
                         onClick={dropObject}
