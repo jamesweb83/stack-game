@@ -507,6 +507,7 @@ const Game = () => {
             {gameOver && (
                 <div className="game-over">
                     <h1>게임 오버!</h1>
+                    <p className="final-score">최종 점수: {score}</p>
                     <button 
                         className="restart-btn" 
                         onClick={restartGame}
