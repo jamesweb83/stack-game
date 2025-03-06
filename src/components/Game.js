@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import Matter from 'matter-js';
 import './Game.css';
+import { db } from '../firebase';
+import { addDoc, collection } from 'firebase/firestore';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -683,6 +685,27 @@ const Game = () => {
             initGame();
         }, 300);
     }, [cleanupGame, initGame]);
+    
+    useEffect(() => {
+        console.log('Firestore DB 연결 상태:', !!db);
+        
+        // 테스트 문서 추가
+        const testFirestore = async () => {
+            try {
+                const docRef = await addDoc(collection(db, 'test'), {
+                    message: '테스트 메시지',
+                    timestamp: new Date()
+                });
+                console.log('테스트 문서 추가 성공:', docRef.id);
+                alert('Firebase 연결 성공! 콘솔을 확인하세요.');
+            } catch (e) {
+                console.error('테스트 문서 추가 실패:', e);
+                alert('Firebase 연결 실패: ' + e.message);
+            }
+        };
+        
+        testFirestore();
+    }, []);
     
     return (
         <div className="game-container" ref={containerRef}>
