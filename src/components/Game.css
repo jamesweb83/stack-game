@@ -154,6 +154,83 @@ canvas {
     margin-bottom: 10px;
 }
 
+/* 랭킹 보드 스타일 */
+.ranking-board {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 300px;
+    max-height: 80%;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+}
+
+.ranking-board h2 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 20px;
+    font-weight: bold;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.ranking-list {
+    overflow-y: auto;
+    flex-grow: 1;
+    max-height: calc(100vh - 200px);
+}
+
+.ranking-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+
+.ranking-item:nth-child(odd) {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.ranking-item.current-player {
+    background-color: rgba(255, 235, 59, 0.3);
+    font-weight: bold;
+}
+
+.rank-position {
+    width: 30px;
+    text-align: right;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.rank-id {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 10px;
+}
+
+.rank-score {
+    font-weight: bold;
+    color: #4285f4;
+}
+
+.no-rankings {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
 @media (max-width: 768px) {
     .score {
         font-size: 20px;
@@ -170,5 +247,23 @@ canvas {
     
     .drop-btn {
         display: flex;
+    }
+    
+    /* 모바일에서는 랭킹 보드를 작게 조정 */
+    .ranking-board {
+        width: 200px;
+        top: 10px;
+        right: 10px;
+        max-height: 50%;
+    }
+    
+    .ranking-item {
+        font-size: 14px;
+        padding: 6px 8px;
+    }
+    
+    .ranking-board h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
     }
 } 

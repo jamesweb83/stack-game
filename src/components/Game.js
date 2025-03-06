@@ -10,6 +10,7 @@ const Game = () => {
     const [isInitialized, setIsInitialized] = useState(false);
     const [playerId, setPlayerId] = useState('');
     const [gameStarted, setGameStarted] = useState(false);
+    const [rankings, setRankings] = useState([]);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -31,6 +32,50 @@ const Game = () => {
     const objectShapes = useMemo(() => ['rectangle'], []);
     
     const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도를 원래 값인 0.3으로 복원
+    
+    // 랭킹 데이터 로드
+    useEffect(() => {
+        const savedRankings = localStorage.getItem('stackGameRankings');
+        if (savedRankings) {
+            setRankings(JSON.parse(savedRankings));
+        }
+    }, []);
+    
+    // 랭킹 업데이트
+    const updateRankings = useCallback((newScore) => {
+        // 기존 랭킹 데이터 가져오기
+        let updatedRankings = [...rankings];
+        
+        // 현재 플레이어가 이미 랭킹에 있는지 확인
+        const existingIndex = updatedRankings.findIndex(rank => rank.id === playerId);
+        
+        if (existingIndex !== -1) {
+            // 플레이어가 이미 있고 현재 점수가 더 높으면 업데이트
+            if (newScore > updatedRankings[existingIndex].score) {
+                updatedRankings[existingIndex].score = newScore;
+                updatedRankings[existingIndex].date = new Date().toISOString();
+            }
+        } else {
+            // 플레이어가 랭킹에 없으면 추가
+            updatedRankings.push({
+                id: playerId,
+                score: newScore,
+                date: new Date().toISOString()
+            });
+        }
+        
+        // 점수 기준으로 내림차순 정렬
+        updatedRankings.sort((a, b) => b.score - a.score);
+        
+        // 상위 30명만 유지
+        updatedRankings = updatedRankings.slice(0, 30);
+        
+        // 랭킹 업데이트 및 저장
+        setRankings(updatedRankings);
+        localStorage.setItem('stackGameRankings', JSON.stringify(updatedRankings));
+        
+        return updatedRankings;
+    }, [rankings, playerId]);
     
     // 게임 정리 함수
     const cleanupGame = useCallback(() => {
@@ -86,8 +131,14 @@ const Game = () => {
     // 게임 종료
     const endGame = useCallback(() => {
         if (gameOver) return;
+        
+        // 랭킹 업데이트
+        if (score > 0) {
+            updateRankings(score);
+        }
+        
         setGameOver(true);
-    }, [gameOver]);
+    }, [gameOver, score, updateRankings]);
     
     // 새 물체 생성
     const createNewObject = useCallback(() => {
@@ -547,6 +598,29 @@ const Game = () => {
                     >
                         떨어뜨리기
                     </button>
+                    
+                    {/* 랭킹 보드 */}
+                    <div className="ranking-board">
+                        <h2>랭킹 TOP 30</h2>
+                        <div className="ranking-list">
+                            {rankings.map((rank, index) => (
+                                <div 
+                                    key={index} 
+                                    className={`ranking-item ${rank.id === playerId ? 'current-player' : ''}`}
+                                >
+                                    <span className="rank-position">{index + 1}.</span>
+                                    <span className="rank-id">{rank.id}</span>
+                                    <span className="rank-score">{rank.score}</span>
+                                </div>
+                            ))}
+                            {rankings.length === 0 && (
+                                <div className="no-rankings">
+                                    아직 랭킹 정보가 없습니다!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
                     {gameOver && (
                         <div className="game-over">
                             <h1>게임 오버!</h1>
