@@ -12,6 +12,7 @@
     background-color: #f0f8ff;
     overflow: hidden;
     touch-action: none;
+    margin: 0 auto;
 }
 
 canvas {
@@ -160,9 +161,9 @@ canvas {
 
 /* 랭킹 보드 스타일 */
 .ranking-board {
-    position: absolute;
+    position: fixed;
     top: 10px;
-    right: -260px;
+    right: 10px;
     width: 250px;
     max-height: 80vh;
     background-color: rgba(0, 0, 0, 0.7);
@@ -318,7 +319,7 @@ canvas {
     
     /* 모바일에서는 랭킹 보드를 작게 조정 */
     .ranking-board {
-        right: -260px;
+        right: 10px;
         width: 250px;
         max-height: 60vh;
     }
