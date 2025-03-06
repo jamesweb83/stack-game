@@ -3,7 +3,6 @@ import Matter from 'matter-js';
 import './Game.css';
 import { db } from '../firebase';
 import { addDoc, collection } from 'firebase/firestore';
-import { saveRanking, getRankings, getPlayerRank } from './RankingService';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -14,7 +13,6 @@ const Game = () => {
     const [playerId, setPlayerId] = useState('');
     const [gameStarted, setGameStarted] = useState(false);
     const [rankings, setRankings] = useState([]);
-    const [playerRank, setPlayerRank] = useState(null);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -69,59 +67,8 @@ const Game = () => {
             }
         };
         
-        // Firebase에서 랭킹 로드
-        const loadFirebaseRankings = async () => {
-            try {
-                console.log('Firebase에서 랭킹 데이터 로드 중...');
-                const firestoreRankings = await getRankings(30);
-                
-                if (firestoreRankings && firestoreRankings.length > 0) {
-                    console.log(`Firebase에서 ${firestoreRankings.length}개의 랭킹 데이터를 가져왔습니다.`);
-                    
-                    // 로컬 랭킹과 Firebase 랭킹 병합
-                    const savedRankings = localStorage.getItem('stackGameRankings');
-                    let localRankings = [];
-                    
-                    if (savedRankings) {
-                        try {
-                            localRankings = JSON.parse(savedRankings);
-                        } catch (error) {
-                            console.error('로컬 랭킹 파싱 오류:', error);
-                            localRankings = [];
-                        }
-                    }
-                    
-                    // 모든 랭킹 데이터 병합
-                    const mergedRankings = [...firestoreRankings];
-                    
-                    // 로컬에만 있는 데이터 추가
-                    localRankings.forEach(localRank => {
-                        const exists = mergedRankings.some(rank => rank.id === localRank.id);
-                        if (!exists) {
-                            mergedRankings.push(localRank);
-                        }
-                    });
-                    
-                    // 점수 및 날짜 기준으로 정렬
-                    mergedRankings.sort((a, b) => b.score - a.score || new Date(b.date) - new Date(a.date));
-                    
-                    // 상태 업데이트
-                    setRankings(mergedRankings);
-                    
-                    // 로컬 스토리지 업데이트
-                    localStorage.setItem('stackGameRankings', JSON.stringify(mergedRankings));
-                } else {
-                    console.log('Firebase에서 가져온 랭킹 데이터가 없습니다. 로컬 데이터만 사용합니다.');
-                    loadRankings(); // 로컬 데이터만 로드
-                }
-            } catch (error) {
-                console.error('Firebase 랭킹 로드 중 오류 발생:', error);
-                loadRankings(); // 오류 발생 시 로컬 데이터 사용
-            }
-        };
-        
-        // 초기 로드 (Firebase + 로컬)
-        loadFirebaseRankings();
+        // 초기 로드
+        loadRankings();
         
         // localStorage 변경 감지 (다른 탭/창에서 변경 시)
         const handleStorageChange = (e) => {
@@ -248,100 +195,7 @@ const Game = () => {
         // 게임 오버 설정
         setGameOver(true);
         
-        // 로컬 랭킹 저장
-        const saveLocalRanking = () => {
-            const localRankings = localStorage.getItem('stackGameRankings');
-            let rankings = [];
-            
-            if (localRankings) {
-                try {
-                    rankings = JSON.parse(localRankings);
-                } catch (e) {
-                    console.error('로컬 랭킹 파싱 오류:', e);
-                    rankings = [];
-                }
-            }
-            
-            // 이미 있는 플레이어인지 확인
-            const existingPlayerIndex = rankings.findIndex(r => r.id === playerId);
-            
-            if (existingPlayerIndex !== -1) {
-                // 기존 점수보다 높은 경우에만 업데이트
-                if (score > rankings[existingPlayerIndex].score) {
-                    rankings[existingPlayerIndex].score = score;
-                    rankings[existingPlayerIndex].date = new Date().toISOString();
-                }
-            } else {
-                // 새 플레이어 추가
-                rankings.push({
-                    id: playerId,
-                    score: score,
-                    date: new Date().toISOString()
-                });
-            }
-            
-            // 점수 순으로 정렬
-            rankings.sort((a, b) => b.score - a.score);
-            
-            // 로컬 스토리지에 저장
-            localStorage.setItem('stackGameRankings', JSON.stringify(rankings));
-            
-            // 상태 업데이트
-            setRankings(rankings);
-        };
-        
-        // 로컬 랭킹 저장
-        saveLocalRanking();
-        
-        // Firebase 랭킹 저장
-        const saveFirebaseRanking = async () => {
-            try {
-                console.log(`Firebase 랭킹 저장 시도 - 플레이어: ${playerId}, 점수: ${score}`);
-                
-                if (!playerId || score <= 0) {
-                    console.log('유효하지 않은 플레이어 ID 또는 점수');
-                    return;
-                }
-                
-                const result = await saveRanking(playerId, score);
-                
-                if (result.updated) {
-                    if (result.newHighScore) {
-                        console.log('새로운 최고 점수가 Firebase에 저장되었습니다!');
-                    } else if (result.newRecord) {
-                        console.log('새로운 플레이어 기록이 Firebase에 저장되었습니다!');
-                    }
-                    
-                    // 전체 랭킹 업데이트
-                    const updatedRankings = await getRankings();
-                    setRankings(updatedRankings);
-                    
-                    // 플레이어 순위 확인
-                    const playerRankInfo = await getPlayerRank(playerId);
-                    if (playerRankInfo) {
-                        console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
-                        setPlayerRank(playerRankInfo);
-                    }
-                } else {
-                    console.log('기존 최고 점수가 더 높아 업데이트되지 않았습니다.');
-                    
-                    // 현재 순위 확인
-                    const playerRankInfo = await getPlayerRank(playerId);
-                    if (playerRankInfo) {
-                        console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
-                        setPlayerRank(playerRankInfo);
-                    }
-                }
-            } catch (error) {
-                console.error('Firebase 랭킹 저장 중 오류 발생:', error);
-                // 오류가 발생해도 게임은 계속 진행
-            }
-        };
-        
-        // Firebase 랭킹 저장 실행
-        saveFirebaseRanking();
-        
-    }, [gameOver, playerId, score]);
+    }, [gameOver]);
     
     // 새 물체 생성
     const createNewObject = useCallback(() => {
@@ -745,6 +599,8 @@ const Game = () => {
     useEffect(() => {
         // 게임이 종료된 경우에만 랭킹 업데이트
         if (gameOver && score > 0 && playerId.trim()) {
+            console.log('게임 오버, 랭킹 업데이트 시작');
+            
             // 현재 랭킹 상태 복제
             let updatedRankings = [...rankings];
             
@@ -785,6 +641,23 @@ const Game = () => {
                 // 상태 및 로컬 스토리지 업데이트
                 setRankings(updatedRankings);
                 localStorage.setItem('stackGameRankings', JSON.stringify(updatedRankings));
+                
+                // Firebase에 랭킹 저장
+                console.log('Firebase에 랭킹 저장 시도');
+                const saveRanking = async () => {
+                    try {
+                        const result = await saveFirebaseRanking(playerId, score);
+                        console.log('Firebase 저장 결과:', result);
+                        
+                        if (result && result.updated) {
+                            console.log('Firebase 랭킹 저장 성공!');
+                        }
+                    } catch (error) {
+                        console.error('Firebase 저장 중 오류 발생:', error);
+                    }
+                };
+                
+                saveRanking();
             }
         }
     }, [gameOver, score, playerId, rankings]);
@@ -810,7 +683,6 @@ const Game = () => {
         setGameStarted(true);
         setScore(0); // 점수 초기화
         setGameOver(false);
-        setPlayerRank(null); // 플레이어 랭킹 초기화
         
         // 랭킹 데이터 최신화
         const savedRankings = localStorage.getItem('stackGameRankings');
@@ -928,6 +800,12 @@ const Game = () => {
                                 onClick={restartGame}
                             >
                                 다시 시작
+                            </button>
+                            <button 
+                                className="save-firebase-btn" 
+                                onClick={() => saveFirebaseRanking(playerId, score)}
+                            >
+                                랭킹 저장 다시 시도
                             </button>
                         </div>
                     )}

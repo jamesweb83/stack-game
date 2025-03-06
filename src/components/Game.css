@@ -265,6 +265,25 @@ canvas {
     text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
 }
 
+/* 랭킹 저장 다시 시도 버튼 */
+.save-firebase-btn {
+    background-color: #4a6fa5;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    margin-top: 10px;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.save-firebase-btn:hover {
+    background-color: #365982;
+}
+
 @media (max-width: 768px) {
     .score {
         font-size: 20px;
