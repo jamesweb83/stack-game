@@ -251,6 +251,20 @@ canvas {
     font-style: italic;
 }
 
+/* 플레이어 랭킹 스타일 */
+.player-rank {
+    font-size: 1.2rem;
+    margin: 10px 0;
+    color: #fff;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.highlight {
+    color: #ffd700;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
 @media (max-width: 768px) {
     .score {
         font-size: 20px;
