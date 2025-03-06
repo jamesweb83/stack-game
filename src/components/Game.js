@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import Matter from 'matter-js';
 import './Game.css';
-import { db } from '../firebase';
+import { db, initialized } from '../firebase';
 import { addDoc, collection } from 'firebase/firestore';
+import { saveRanking, getRankings, getPlayerRank } from './RankingService';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -13,6 +14,7 @@ const Game = () => {
     const [playerId, setPlayerId] = useState('');
     const [gameStarted, setGameStarted] = useState(false);
     const [rankings, setRankings] = useState([]);
+    const [playerRank, setPlayerRank] = useState(null);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -644,7 +646,7 @@ const Game = () => {
                 
                 // Firebase에 랭킹 저장
                 console.log('Firebase에 랭킹 저장 시도');
-                const saveRanking = async () => {
+                const saveFbRanking = async () => {
                     try {
                         const result = await saveFirebaseRanking(playerId, score);
                         console.log('Firebase 저장 결과:', result);
@@ -657,7 +659,7 @@ const Game = () => {
                     }
                 };
                 
-                saveRanking();
+                saveFbRanking();
             }
         }
     }, [gameOver, score, playerId, rankings]);
@@ -727,6 +729,76 @@ const Game = () => {
         
         testFirestore();
     }, []);
+    
+    // DB 연결 상태 확인
+    useEffect(() => {
+        console.log('Firebase 초기화 상태:', initialized);
+        console.log('Firebase DB 연결 상태:', !!db);
+        
+        if (!initialized || !db) {
+            console.warn('Firebase가 초기화되지 않았습니다. 랭킹 저장 기능이 작동하지 않을 수 있습니다.');
+        }
+    }, []);
+    
+    // Firebase에 랭킹 저장하는 함수
+    const saveFirebaseRanking = async (playerId, score) => {
+        try {
+            console.log(`Firebase 랭킹 저장 시도 - 플레이어: ${playerId}, 점수: ${score}`);
+            console.log('Firebase 초기화 상태:', initialized);
+            console.log('Firebase DB 연결 상태:', !!db);
+            
+            if (!initialized || !db) {
+                console.error('Firebase가 초기화되지 않았습니다. 랭킹을 저장할 수 없습니다.');
+                return { error: '초기화 오류' };
+            }
+            
+            if (!playerId || score <= 0) {
+                console.log('유효하지 않은 플레이어 ID 또는 점수');
+                return { error: '유효하지 않은 데이터' };
+            }
+            
+            const result = await saveRanking(playerId, score);
+            console.log('Firebase 저장 결과:', result);
+            
+            if (result.updated) {
+                if (result.newHighScore) {
+                    console.log('새로운 최고 점수가 Firebase에 저장되었습니다!');
+                } else if (result.newRecord) {
+                    console.log('새로운 플레이어 기록이 Firebase에 저장되었습니다!');
+                }
+                
+                // 전체 랭킹 업데이트
+                const updatedRankings = await getRankings();
+                console.log('Firebase에서 가져온 업데이트된 랭킹:', updatedRankings);
+                if (updatedRankings && updatedRankings.length > 0) {
+                    setRankings(updatedRankings);
+                }
+                
+                // 플레이어 순위 확인
+                const playerRankInfo = await getPlayerRank(playerId);
+                if (playerRankInfo) {
+                    console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                    setPlayerRank(playerRankInfo);
+                }
+            } else {
+                console.log('기존 최고 점수가 더 높아 업데이트되지 않았습니다.');
+                
+                // 현재 순위 확인
+                const playerRankInfo = await getPlayerRank(playerId);
+                if (playerRankInfo) {
+                    console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                    setPlayerRank(playerRankInfo);
+                }
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('Firebase 랭킹 저장 중 오류 발생:', error);
+            console.error('오류 세부 정보:', error.message);
+            // 오류가 발생해도 게임은 계속 진행
+            return { error: error.message };
+        }
+    };
     
     return (
         <div className="game-container" ref={containerRef}>
