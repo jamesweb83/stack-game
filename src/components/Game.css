@@ -7,7 +7,7 @@
 
 .game-container {
     position: relative;
-    width: 100%;
+    width: 70%;
     height: 100vh;
     background-color: #f0f8ff;
     overflow: hidden;
@@ -162,7 +162,7 @@ canvas {
 .ranking-board {
     position: absolute;
     top: 10px;
-    right: 10px;
+    right: -260px;
     width: 250px;
     max-height: 80vh;
     background-color: rgba(0, 0, 0, 0.7);
@@ -318,10 +318,9 @@ canvas {
     
     /* 모바일에서는 랭킹 보드를 작게 조정 */
     .ranking-board {
-        width: 200px;
-        top: 10px;
-        right: 10px;
-        max-height: 50%;
+        right: -260px;
+        width: 250px;
+        max-height: 60vh;
     }
     
     .ranking-list {
