@@ -28,7 +28,7 @@ const Game = () => {
     // useMemo로 objectShapes 메모이제이션
     const objectShapes = useMemo(() => ['rectangle', 'circle', 'polygon'], []);
     
-    const platformAngleToleranceRef = useRef(0.2); // 균형 허용 각도를 0.3에서 0.2로 줄임 (난이도 증가)
+    const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도를 원래 값인 0.3으로 복원
     
     // 게임 정리 함수
     const cleanupGame = useCallback(() => {
