@@ -25,8 +25,8 @@ const Game = () => {
     const OBJECT_MAX_SIZE = 50;
     const GRAVITY = 1.0;
     
-    // useMemo로 objectShapes 메모이제이션
-    const objectShapes = useMemo(() => ['rectangle', 'circle', 'polygon'], []);
+    // useMemo로 objectShapes 메모이제이션 - 사각형만 사용
+    const objectShapes = useMemo(() => ['rectangle'], []);
     
     const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도를 원래 값인 0.3으로 복원
     
@@ -106,34 +106,6 @@ const Game = () => {
         if (shape === 'rectangle') {
             currentObjectRef.current = Matter.Bodies.rectangle(
                 x, dropStartYRef.current, size, size * 0.6,
-                {
-                    label: 'stackable',
-                    frictionAir: 0.05,
-                    friction: 2.0,
-                    frictionStatic: 3.0,
-                    restitution: 0.3,
-                    density: size / 30,
-                    collisionCount: 0,
-                    render: { fillStyle: color }
-                }
-            );
-        } else if (shape === 'circle') {
-            currentObjectRef.current = Matter.Bodies.circle(
-                x, dropStartYRef.current, size / 2,
-                {
-                    label: 'stackable',
-                    frictionAir: 0.05,
-                    friction: 2.0,
-                    frictionStatic: 3.0,
-                    restitution: 0.3,
-                    density: size / 30,
-                    collisionCount: 0,
-                    render: { fillStyle: color }
-                }
-            );
-        } else if (shape === 'polygon') {
-            currentObjectRef.current = Matter.Bodies.polygon(
-                x, dropStartYRef.current, Math.floor(Math.random() * 3) + 3, size / 2,
                 {
                     label: 'stackable',
                     frictionAir: 0.05,
