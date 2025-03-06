@@ -89,7 +89,7 @@ canvas {
     color: white;
     font-size: 16px;
     border: none;
-    display: none;
+    display: none; /* 기본적으로 숨김 처리 */
     justify-content: center;
     align-items: center;
     cursor: pointer;
@@ -152,7 +152,6 @@ canvas {
     background-color: #45a049;
 }
 
-/* 게임 오버 화면에 플레이어 ID 스타일 */
 .player-id {
     color: white;
     font-size: 24px;
@@ -189,7 +188,23 @@ canvas {
 .ranking-list {
     overflow-y: auto;
     flex-grow: 1;
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 250px);
+    scrollbar-width: thin;
+    scrollbar-color: #aaa #f0f0f0;
+}
+
+.ranking-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ranking-list::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.ranking-list::-webkit-scrollbar-thumb {
+    background-color: #aaa;
+    border-radius: 4px;
 }
 
 .ranking-item {
@@ -250,6 +265,7 @@ canvas {
         font-size: 36px;
     }
     
+    /* 모바일에서만 떨어뜨리기 버튼 표시 */
     .drop-btn {
         display: flex;
     }
@@ -260,6 +276,10 @@ canvas {
         top: 10px;
         right: 10px;
         max-height: 50%;
+    }
+    
+    .ranking-list {
+        max-height: calc(50vh - 120px);
     }
     
     .ranking-item {
