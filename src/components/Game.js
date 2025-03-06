@@ -599,6 +599,13 @@ const Game = () => {
                             console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
                             setPlayerRank(playerRankInfo);
                         }
+                    } else if (result && result.reason === 'not-in-top-30') {
+                        console.log('TOP 30에 들어갈 수 없는 점수입니다.');
+                        // TOP 30에 들어가지 못하는 경우 플레이어 랭킹 정보 설정
+                        setPlayerRank({
+                            rank: 31, // 30위 밖이라는 의미로 31로 설정
+                            total: 30
+                        });
                     }
                 } catch (error) {
                     console.error('Firebase 저장 중 오류 발생:', error);
@@ -701,6 +708,36 @@ const Game = () => {
                 return { error: '유효하지 않은 데이터' };
             }
             
+            // 현재 TOP 30 랭킹 데이터 가져오기
+            const currentRankings = await getRankings(30);
+            
+            // TOP 30에 들어갈 수 있는지 확인
+            let canEnterTop30 = false;
+            
+            // 랭킹이 30개 미만이면 무조건 들어갈 수 있음
+            if (currentRankings.length < 30) {
+                canEnterTop30 = true;
+            } else {
+                // 현재 플레이어가 이미 랭킹에 있는지 확인
+                const existingPlayerRank = currentRankings.find(rank => rank.id === playerId);
+                
+                if (existingPlayerRank) {
+                    // 기존 플레이어의 점수보다 높으면 업데이트 가능
+                    canEnterTop30 = score > existingPlayerRank.score;
+                } else {
+                    // 새 플레이어는 30위 점수보다 높아야 진입 가능
+                    const lowestRankScore = currentRankings[currentRankings.length - 1].score;
+                    canEnterTop30 = score > lowestRankScore;
+                }
+            }
+            
+            // TOP 30에 들어갈 수 없으면 저장하지 않음
+            if (!canEnterTop30) {
+                console.log('TOP 30에 들어갈 수 없는 점수입니다. 파이어베이스에 저장하지 않습니다.');
+                return { updated: false, reason: 'not-in-top-30' };
+            }
+            
+            // TOP 30에 들어갈 수 있으면 저장 진행
             const result = await saveRanking(playerId, score);
             console.log('Firebase 저장 결과:', result);
             
@@ -806,9 +843,14 @@ const Game = () => {
                             <h1>게임 오버!</h1>
                             <p className="player-id">플레이어: {playerId}</p>
                             <p className="final-score">최종 점수: <span className="highlight">{score}</span></p>
-                            {playerRank && (
+                            {playerRank && playerRank.rank <= 30 && (
                                 <p className="player-rank">
                                     현재 순위: <span className="highlight">{playerRank.rank}</span>/{playerRank.total}
+                                </p>
+                            )}
+                            {playerRank && playerRank.rank > 30 && (
+                                <p className="player-rank">
+                                    TOP 30에 들어가지 못했습니다.
                                 </p>
                             )}
                             <button 
@@ -816,12 +858,6 @@ const Game = () => {
                                 onClick={restartGame}
                             >
                                 다시 시작
-                            </button>
-                            <button 
-                                className="save-firebase-btn" 
-                                onClick={() => saveFirebaseRanking(playerId, score)}
-                            >
-                                랭킹 저장 다시 시도
                             </button>
                         </div>
                     )}
