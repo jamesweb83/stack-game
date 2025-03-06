@@ -18,7 +18,7 @@ const Game = () => {
     const dropStartYRef = useRef(80);
     
     // 게임 설정
-    const PILLAR_WIDTH = 40;
+    const PILLAR_WIDTH = 50;
     const PLATFORM_WIDTH = 240;
     const PLATFORM_HEIGHT = 20;
     const OBJECT_MIN_SIZE = 20;
