@@ -47,24 +47,21 @@ const Game = () => {
     
     // 랭킹 데이터 로드
     useEffect(() => {
-        const loadRankings = () => {
-            const savedRankings = localStorage.getItem('stackGameRankings');
-            
-            if (savedRankings) {
-                try {
-                    const parsedRankings = JSON.parse(savedRankings);
-                    // 유효한 랭킹 데이터만 필터링
-                    const validRankings = parsedRankings.filter(
-                        rank => rank && rank.id && typeof rank.score === 'number' && rank.score > 0
-                    );
-                    setRankings(validRankings);
-                } catch (error) {
-                    // 오류 발생 시 빈 배열로 초기화
+        const loadRankings = async () => {
+            try {
+                // 파이어베이스에서 랭킹 데이터 가져오기
+                console.log('파이어베이스에서 랭킹 데이터 로드 중...');
+                const firebaseRankings = await getRankings(30);
+                console.log('파이어베이스에서 가져온 랭킹:', firebaseRankings);
+                
+                if (firebaseRankings && firebaseRankings.length > 0) {
+                    setRankings(firebaseRankings);
+                } else {
+                    console.log('파이어베이스에서 랭킹을 가져오지 못했습니다.');
                     setRankings([]);
-                    localStorage.removeItem('stackGameRankings');
                 }
-            } else {
-                // 저장된 랭킹이 없으면 빈 배열로 설정
+            } catch (error) {
+                console.error('랭킹 데이터 로드 중 오류 발생:', error);
                 setRankings([]);
             }
         };
@@ -72,71 +69,47 @@ const Game = () => {
         // 초기 로드
         loadRankings();
         
-        // localStorage 변경 감지 (다른 탭/창에서 변경 시)
-        const handleStorageChange = (e) => {
-            if (e.key === 'stackGameRankings') {
-                loadRankings();
-            }
-        };
-        
-        window.addEventListener('storage', handleStorageChange);
+        // 30초마다 랭킹 데이터 갱신
+        const rankingInterval = setInterval(loadRankings, 30000);
         
         return () => {
-            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(rankingInterval);
         };
     }, []);
     
     // 랭킹 업데이트
-    const updateRankings = useCallback((newScore) => {
-        // 기존 랭킹 데이터 가져오기
-        let updatedRankings = [...rankings];
-        
+    const updateRankings = useCallback(async (newScore) => {
         // 플레이어 ID가 비어있으면 처리하지 않음
-        if (!playerId.trim()) {
-            return updatedRankings;
+        if (!playerId.trim() || newScore <= 0) {
+            return;
         }
         
-        // 현재 플레이어가 이미 랭킹에 있는지 확인
-        const existingIndex = updatedRankings.findIndex(rank => rank.id === playerId);
-        
-        if (existingIndex !== -1) {
-            // 플레이어가 이미 있고 현재 점수가 더 높으면 업데이트
-            if (newScore > updatedRankings[existingIndex].score) {
-                updatedRankings[existingIndex].score = newScore;
-                updatedRankings[existingIndex].date = new Date().toISOString();
-            }
-        } else {
-            // 플레이어가 랭킹에 없으면 추가
-            updatedRankings.push({
-                id: playerId,
-                score: newScore,
-                date: new Date().toISOString()
-            });
-        }
-        
-        // 점수 기준으로 내림차순 정렬 (동점일 경우 최신 날짜 우선)
-        updatedRankings.sort((a, b) => {
-            // 점수가 다르면 점수로 정렬
-            if (b.score !== a.score) {
-                return b.score - a.score;
-            }
-            // 점수가 같으면 날짜로 정렬 (최신이 위로)
-            return new Date(b.date) - new Date(a.date);
-        });
-        
-        // 상위 30명만 유지
-        updatedRankings = updatedRankings.slice(0, 30);
-        
-        // 랭킹 업데이트 및 저장
-        setRankings(updatedRankings);
         try {
-            const rankingsJson = JSON.stringify(updatedRankings);
-            localStorage.setItem('stackGameRankings', rankingsJson);
+            // 파이어베이스에 랭킹 저장
+            console.log(`파이어베이스에 랭킹 저장 시도 - 플레이어: ${playerId}, 점수: ${newScore}`);
+            const result = await saveRanking(playerId, newScore);
+            console.log('파이어베이스 저장 결과:', result);
+            
+            // 파이어베이스에서 최신 랭킹을 가져옴
+            const updatedRankings = await getRankings(30);
+            console.log('파이어베이스에서 가져온 업데이트된 랭킹:', updatedRankings);
+            
+            if (updatedRankings && updatedRankings.length > 0) {
+                setRankings(updatedRankings);
+            }
+            
+            // 플레이어 순위 정보 가져오기
+            const playerRankInfo = await getPlayerRank(playerId);
+            if (playerRankInfo) {
+                console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                setPlayerRank(playerRankInfo);
+            }
+            
+            return updatedRankings;
         } catch (error) {
-            // 저장 오류 처리 - 기록만 하고 계속 진행
+            console.error('랭킹 업데이트 중 오류 발생:', error);
+            return rankings;
         }
-        
-        return updatedRankings;
     }, [rankings, playerId]);
     
     // 게임 정리 함수
@@ -601,68 +574,40 @@ const Game = () => {
     useEffect(() => {
         // 게임이 종료된 경우에만 랭킹 업데이트
         if (gameOver && score > 0 && playerId.trim()) {
-            console.log('게임 오버, 랭킹 업데이트 시작');
+            console.log('게임 오버, 파이어베이스 랭킹 업데이트 시작');
             
-            // 현재 랭킹 상태 복제
-            let updatedRankings = [...rankings];
-            
-            // 현재 플레이어가 이미 랭킹에 있는지 확인
-            const existingIndex = updatedRankings.findIndex(rank => rank.id === playerId);
-            
-            let isUpdated = false;
-            
-            if (existingIndex !== -1) {
-                // 플레이어가 있고 현재 점수가 더 높으면 업데이트
-                if (score > updatedRankings[existingIndex].score) {
-                    updatedRankings[existingIndex].score = score;
-                    updatedRankings[existingIndex].date = new Date().toISOString();
-                    isUpdated = true;
-                }
-            } else {
-                // 플레이어가 랭킹에 없으면 추가
-                updatedRankings.push({
-                    id: playerId,
-                    score: score,
-                    date: new Date().toISOString()
-                });
-                isUpdated = true;
-            }
-            
-            if (isUpdated) {
-                // 점수로 정렬
-                updatedRankings.sort((a, b) => {
-                    if (b.score !== a.score) {
-                        return b.score - a.score;
-                    }
-                    return new Date(b.date) - new Date(a.date);
-                });
-                
-                // 상위 30명만 유지
-                updatedRankings = updatedRankings.slice(0, 30);
-                
-                // 상태 및 로컬 스토리지 업데이트
-                setRankings(updatedRankings);
-                localStorage.setItem('stackGameRankings', JSON.stringify(updatedRankings));
-                
-                // Firebase에 랭킹 저장
-                console.log('Firebase에 랭킹 저장 시도');
-                const saveFbRanking = async () => {
-                    try {
-                        const result = await saveFirebaseRanking(playerId, score);
-                        console.log('Firebase 저장 결과:', result);
+            // Firebase에 랭킹 저장
+            const saveFbRanking = async () => {
+                try {
+                    const result = await saveFirebaseRanking(playerId, score);
+                    console.log('Firebase 저장 결과:', result);
+                    
+                    if (result && result.updated) {
+                        console.log('Firebase 랭킹 저장 성공!');
                         
-                        if (result && result.updated) {
-                            console.log('Firebase 랭킹 저장 성공!');
+                        // 파이어베이스에서 최신 랭킹 가져오기
+                        const updatedRankings = await getRankings();
+                        console.log('Firebase에서 가져온 업데이트된 랭킹:', updatedRankings);
+                        
+                        if (updatedRankings && updatedRankings.length > 0) {
+                            setRankings(updatedRankings);
                         }
-                    } catch (error) {
-                        console.error('Firebase 저장 중 오류 발생:', error);
+                        
+                        // 플레이어 순위 확인
+                        const playerRankInfo = await getPlayerRank(playerId);
+                        if (playerRankInfo) {
+                            console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                            setPlayerRank(playerRankInfo);
+                        }
                     }
-                };
-                
-                saveFbRanking();
-            }
+                } catch (error) {
+                    console.error('Firebase 저장 중 오류 발생:', error);
+                }
+            };
+            
+            saveFbRanking();
         }
-    }, [gameOver, score, playerId, rankings]);
+    }, [gameOver, score, playerId]);
     
     // 게임 시작 함수
     const startGame = () => {
@@ -686,20 +631,19 @@ const Game = () => {
         setScore(0); // 점수 초기화
         setGameOver(false);
         
-        // 랭킹 데이터 최신화
-        const savedRankings = localStorage.getItem('stackGameRankings');
-        if (savedRankings) {
+        // 파이어베이스에서 최신 랭킹 가져오기
+        const loadFirebaseRankings = async () => {
             try {
-                const parsedRankings = JSON.parse(savedRankings);
-                // 유효한 랭킹 데이터만 필터링
-                const validRankings = parsedRankings.filter(
-                    rank => rank && rank.id && typeof rank.score === 'number' && rank.score > 0
-                );
-                setRankings(validRankings);
+                const firebaseRankings = await getRankings(30);
+                if (firebaseRankings && firebaseRankings.length > 0) {
+                    setRankings(firebaseRankings);
+                }
             } catch (error) {
-                // 무시하고 계속 진행
+                console.error('랭킹 데이터 로드 중 오류 발생:', error);
             }
-        }
+        };
+        
+        loadFirebaseRankings();
         
         // 약간의 지연 후 초기화
         setTimeout(() => {
