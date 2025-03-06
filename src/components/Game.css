@@ -58,6 +58,11 @@ canvas {
     font-weight: bold;
 }
 
+.highlight {
+    color: #FFD700; /* 금색 */
+    font-size: 32px;
+}
+
 .restart-btn {
     padding: 12px 24px;
     font-size: 18px;

@@ -36,15 +36,38 @@ const Game = () => {
     // 랭킹 데이터 로드
     useEffect(() => {
         const savedRankings = localStorage.getItem('stackGameRankings');
+        console.log('저장된 랭킹 데이터 로드:', savedRankings);
+        
         if (savedRankings) {
-            setRankings(JSON.parse(savedRankings));
+            try {
+                const parsedRankings = JSON.parse(savedRankings);
+                console.log('파싱된 랭킹:', parsedRankings);
+                setRankings(parsedRankings);
+            } catch (error) {
+                console.error('랭킹 데이터 파싱 오류:', error);
+                // 오류 발생 시 빈 배열로 초기화
+                setRankings([]);
+                localStorage.removeItem('stackGameRankings');
+            }
+        } else {
+            // 저장된 랭킹이 없으면 빈 배열로 설정
+            setRankings([]);
         }
     }, []);
     
     // 랭킹 업데이트
     const updateRankings = useCallback((newScore) => {
+        console.log('updateRankings 호출됨:', newScore, playerId);
+        
         // 기존 랭킹 데이터 가져오기
         let updatedRankings = [...rankings];
+        console.log('현재 랭킹 상태:', updatedRankings);
+        
+        // 플레이어 ID가 비어있으면 처리하지 않음
+        if (!playerId.trim()) {
+            console.log('플레이어 ID가 비어있어 랭킹 업데이트 취소');
+            return updatedRankings;
+        }
         
         // 현재 플레이어가 이미 랭킹에 있는지 확인
         const existingIndex = updatedRankings.findIndex(rank => rank.id === playerId);
@@ -52,11 +75,15 @@ const Game = () => {
         if (existingIndex !== -1) {
             // 플레이어가 이미 있고 현재 점수가 더 높으면 업데이트
             if (newScore > updatedRankings[existingIndex].score) {
+                console.log('기존 플레이어 점수 업데이트:', existingIndex, newScore);
                 updatedRankings[existingIndex].score = newScore;
                 updatedRankings[existingIndex].date = new Date().toISOString();
+            } else {
+                console.log('기존 점수가 더 높아 업데이트하지 않음');
             }
         } else {
             // 플레이어가 랭킹에 없으면 추가
+            console.log('새 플레이어 랭킹 추가:', playerId, newScore);
             updatedRankings.push({
                 id: playerId,
                 score: newScore,
@@ -64,15 +91,30 @@ const Game = () => {
             });
         }
         
-        // 점수 기준으로 내림차순 정렬
-        updatedRankings.sort((a, b) => b.score - a.score);
+        // 점수 기준으로 내림차순 정렬 (동점일 경우 최신 날짜 우선)
+        updatedRankings.sort((a, b) => {
+            // 점수가 다르면 점수로 정렬
+            if (b.score !== a.score) {
+                return b.score - a.score;
+            }
+            // 점수가 같으면 날짜로 정렬 (최신이 위로)
+            return new Date(b.date) - new Date(a.date);
+        });
         
         // 상위 30명만 유지
         updatedRankings = updatedRankings.slice(0, 30);
         
+        console.log('정렬 및 필터링 후 랭킹:', updatedRankings);
+        
         // 랭킹 업데이트 및 저장
         setRankings(updatedRankings);
-        localStorage.setItem('stackGameRankings', JSON.stringify(updatedRankings));
+        try {
+            const rankingsJson = JSON.stringify(updatedRankings);
+            localStorage.setItem('stackGameRankings', rankingsJson);
+            console.log('랭킹 저장 완료:', rankingsJson);
+        } catch (error) {
+            console.error('랭킹 저장 오류:', error);
+        }
         
         return updatedRankings;
     }, [rankings, playerId]);
@@ -116,6 +158,7 @@ const Game = () => {
     const updateScore = useCallback(() => {
         setScore(prevScore => {
             const newScore = prevScore + 1;
+            console.log('점수 업데이트:', newScore);
             
             // 난이도 점진적 증가
             if (newScore > 5) {
@@ -132,13 +175,54 @@ const Game = () => {
     const endGame = useCallback(() => {
         if (gameOver) return;
         
-        // 랭킹 업데이트
-        if (score > 0) {
-            updateRankings(score);
-        }
+        // 상태 업데이트 전에 UI에 표시할 점수 가져오기
+        const finalScore = score;
+        console.log('게임 종료 시 최종 점수:', finalScore);
         
+        // 게임 오버 설정
         setGameOver(true);
-    }, [gameOver, score, updateRankings]);
+        
+        // 랭킹 업데이트 - setTimeout으로 상태 업데이트 후 실행
+        setTimeout(() => {
+            if (finalScore > 0) {
+                console.log('랭킹 업데이트 실행:', playerId, finalScore);
+                
+                // 랭킹 복제
+                let updatedRankings = [...rankings];
+                
+                // 현재 플레이어 찾기
+                const existingIndex = updatedRankings.findIndex(rank => rank.id === playerId);
+                
+                if (existingIndex !== -1) {
+                    // 기존 랭킹보다 높은 점수면 업데이트
+                    if (finalScore > updatedRankings[existingIndex].score) {
+                        updatedRankings[existingIndex].score = finalScore;
+                        updatedRankings[existingIndex].date = new Date().toISOString();
+                    }
+                } else {
+                    // 새 플레이어 추가
+                    updatedRankings.push({
+                        id: playerId,
+                        score: finalScore,
+                        date: new Date().toISOString()
+                    });
+                }
+                
+                // 정렬 및 저장
+                updatedRankings.sort((a, b) => {
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    }
+                    return new Date(b.date) - new Date(a.date);
+                });
+                
+                updatedRankings = updatedRankings.slice(0, 30);
+                setRankings(updatedRankings);
+                localStorage.setItem('stackGameRankings', JSON.stringify(updatedRankings));
+                console.log('최종 저장된 랭킹:', updatedRankings);
+            }
+        }, 100);
+    }, [gameOver, score, rankings, playerId]);
     
     // 새 물체 생성
     const createNewObject = useCallback(() => {
@@ -545,6 +629,25 @@ const Game = () => {
             return;
         }
         
+        // 게임 시작 시 플레이어를 랭킹에 추가 (아직 없는 경우)
+        if (rankings.findIndex(rank => rank.id === playerId) === -1) {
+            console.log('게임 시작 시 신규 플레이어 추가:', playerId);
+            const newRankings = [...rankings, {
+                id: playerId,
+                score: 0,
+                date: new Date().toISOString()
+            }];
+            
+            // 점수 순으로 정렬
+            newRankings.sort((a, b) => b.score - a.score || new Date(b.date) - new Date(a.date));
+            
+            // 상위 30명만 유지
+            const finalRankings = newRankings.slice(0, 30);
+            
+            setRankings(finalRankings);
+            localStorage.setItem('stackGameRankings', JSON.stringify(finalRankings));
+        }
+        
         setGameStarted(true);
         setScore(0);
         setGameOver(false);
@@ -557,8 +660,10 @@ const Game = () => {
         
         // 게임 상태 초기화
         setGameStarted(true);
-        setScore(0);
+        setScore(0); // 점수 초기화
         setGameOver(false);
+        
+        console.log('게임 재시작, 점수 초기화');
         
         // 약간의 지연 후 초기화
         setTimeout(() => {
@@ -625,7 +730,7 @@ const Game = () => {
                         <div className="game-over">
                             <h1>게임 오버!</h1>
                             <p className="player-id">플레이어: {playerId}</p>
-                            <p className="final-score">최종 점수: {score}</p>
+                            <p className="final-score">최종 점수: <span className="highlight">{score}</span></p>
                             <button 
                                 className="restart-btn" 
                                 onClick={restartGame}
