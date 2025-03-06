@@ -17,8 +17,8 @@ import {
 // 랭킹 컬렉션 참조
 const getRankingsRef = () => {
   if (!db) {
-    console.error('Firebase DB가 초기화되지 않았습니다.');
-    throw new Error('Firebase DB가 초기화되지 않았습니다.');
+    console.error('Firebase DB is not initialized.');
+    throw new Error('Firebase DB is not initialized.');
   }
   return collection(db, 'rankings');
 };
@@ -26,22 +26,22 @@ const getRankingsRef = () => {
 // 랭킹 저장하기 (새 점수 또는 기존 점수 업데이트)
 export const saveRanking = async (playerId, score) => {
   try {
-    console.log(`saveRanking 함수 호출됨 - 플레이어 ID: ${playerId}, 점수: ${score}`);
-    console.log('Firebase DB 연결 상태:', !!db);
-    console.log('Firebase 초기화 상태:', initialized);
+    console.log(`saveRanking function called - Player ID: ${playerId}, Score: ${score}`);
+    console.log('Firebase DB connection status:', !!db);
+    console.log('Firebase initialization status:', initialized);
     
     if (!initialized || !db) {
-      console.error('Firebase DB가 초기화되지 않았습니다.');
-      throw new Error('Firebase DB가 초기화되지 않았습니다.');
+      console.error('Firebase DB is not initialized.');
+      throw new Error('Firebase DB is not initialized.');
     }
     
     // 랭킹 컬렉션 참조 가져오기
     let rankingsRefCheck;
     try {
       rankingsRefCheck = getRankingsRef();
-      console.log('랭킹 컬렉션 참조 생성됨');
+      console.log('Ranking collection reference created');
     } catch (refError) {
-      console.error('랭킹 컬렉션 참조 생성 실패:', refError);
+      console.error('Failed to create ranking collection reference:', refError);
       throw refError;
     }
     
@@ -49,18 +49,18 @@ export const saveRanking = async (playerId, score) => {
     let playerQuery;
     try {
       playerQuery = query(rankingsRefCheck, where("playerId", "==", playerId));
-      console.log('플레이어 쿼리 생성됨');
+      console.log('Player query created');
     } catch (queryBuildError) {
-      console.error('플레이어 쿼리 생성 실패:', queryBuildError);
+      console.error('Failed to create player query:', queryBuildError);
       throw queryBuildError;
     }
     
     let querySnapshot;
     try {
       querySnapshot = await getDocs(playerQuery);
-      console.log('쿼리 실행 완료, 결과:', querySnapshot.empty ? '플레이어 없음' : '플레이어 있음');
+      console.log('Query execution completed, result:', querySnapshot.empty ? 'Player not found' : 'Player found');
     } catch (queryExecuteError) {
-      console.error('쿼리 실행 실패:', queryExecuteError);
+      console.error('Query execution failed:', queryExecuteError);
       throw queryExecuteError;
     }
     
@@ -70,48 +70,48 @@ export const saveRanking = async (playerId, score) => {
         const playerDoc = querySnapshot.docs[0];
         const playerData = playerDoc.data();
         
-        console.log('기존 플레이어 데이터:', playerData);
-        console.log('기존 점수:', playerData.score, '새 점수:', score);
+        console.log('Existing player data:', playerData);
+        console.log('Existing score:', playerData.score, 'New score:', score);
         
         // 기존 점수보다 높은 경우에만 업데이트
         if (score > playerData.score) {
-          console.log('새 점수가 더 높음, 업데이트 시도...');
+          console.log('New score is higher, attempting update...');
           await updateDoc(doc(db, 'rankings', playerDoc.id), {
             score: score,
             updatedAt: serverTimestamp()
           });
-          console.log('업데이트 성공!');
+          console.log('Update successful!');
           return { updated: true, newHighScore: true };
         }
         
-        console.log('기존 점수가 더 높음, 업데이트하지 않음');
+        console.log('Existing score is higher, no update needed');
         return { updated: false, newHighScore: false };
       } catch (updateError) {
-        console.error('기록 업데이트 실패:', updateError);
+        console.error('Failed to update record:', updateError);
         throw updateError;
       }
     } 
     // 새 플레이어 추가
     else {
       try {
-        console.log('새 플레이어, 추가 시도...');
+        console.log('New player, attempting to add...');
         const newDoc = await addDoc(rankingsRefCheck, {
           playerId: playerId,
           score: score,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        console.log('새 플레이어 추가 성공! 문서 ID:', newDoc.id);
+        console.log('New player added successfully! Document ID:', newDoc.id);
         return { updated: true, newRecord: true };
       } catch (addError) {
-        console.error('새 플레이어 추가 실패:', addError);
+        console.error('Failed to add new player:', addError);
         throw addError;
       }
     }
   } catch (error) {
-    console.error("랭킹 저장 중 오류 발생:", error);
-    console.error("오류 세부 정보:", error.message);
-    console.error("오류 스택:", error.stack);
+    console.error("Error while saving ranking:", error);
+    console.error("Error details:", error.message);
+    console.error("Error stack:", error.stack);
     throw error;
   }
 };
@@ -119,10 +119,10 @@ export const saveRanking = async (playerId, score) => {
 // 랭킹 목록 가져오기
 export const getRankings = async (limitCount = 30) => {
   try {
-    console.log('getRankings 함수 호출됨, 제한 수:', limitCount);
+    console.log('getRankings function called, limit count:', limitCount);
     
     if (!initialized || !db) {
-      console.error('Firebase DB가 초기화되지 않았습니다.');
+      console.error('Firebase DB is not initialized.');
       return [];
     }
     
@@ -134,9 +134,9 @@ export const getRankings = async (limitCount = 30) => {
       limit(limitCount)
     );
     
-    console.log('랭킹 쿼리 생성됨, 데이터 가져오기 시도...');
+    console.log('Ranking query created, attempting to fetch data...');
     const querySnapshot = await getDocs(rankingsQuery);
-    console.log(`랭킹 데이터 ${querySnapshot.size}개 가져옴`);
+    console.log(`Retrieved ${querySnapshot.size} ranking records`);
     
     return querySnapshot.docs.map((doc) => {
       const data = doc.data();
@@ -147,8 +147,8 @@ export const getRankings = async (limitCount = 30) => {
       };
     });
   } catch (error) {
-    console.error("랭킹 가져오기 중 오류 발생:", error);
-    console.error("오류 세부 정보:", error.message);
+    console.error("Error while retrieving rankings:", error);
+    console.error("Error details:", error.message);
     return [];
   }
 };
@@ -156,32 +156,32 @@ export const getRankings = async (limitCount = 30) => {
 // 플레이어의 랭킹 순위 가져오기
 export const getPlayerRank = async (playerId) => {
   try {
-    console.log(`getPlayerRank 함수 호출됨 - 플레이어 ID: ${playerId}`);
+    console.log(`getPlayerRank function called - Player ID: ${playerId}`);
     
     if (!initialized || !db) {
-      console.error('Firebase DB가 초기화되지 않았습니다.');
+      console.error('Firebase DB is not initialized.');
       return null;
     }
     
     const rankings = await getRankings(100); // 충분히 많은 랭킹을 가져옴
-    console.log(`총 ${rankings.length}개의 랭킹 데이터를 가져옴`);
+    console.log(`Retrieved ${rankings.length} ranking records in total`);
     
     const playerIndex = rankings.findIndex(rank => rank.id === playerId);
-    console.log(`플레이어 인덱스: ${playerIndex}`);
+    console.log(`Player index: ${playerIndex}`);
     
     if (playerIndex !== -1) {
       const rankInfo = {
         rank: playerIndex + 1,
         total: rankings.length
       };
-      console.log(`플레이어 순위 정보:`, rankInfo);
+      console.log(`Player ranking info:`, rankInfo);
       return rankInfo;
     }
-    console.log('플레이어를 랭킹에서 찾을 수 없음');
+    console.log('Player not found in rankings');
     return null;
   } catch (error) {
-    console.error("플레이어 랭킹 가져오기 중 오류 발생:", error);
-    console.error("오류 세부 정보:", error.message);
+    console.error("Error while retrieving player ranking:", error);
+    console.error("Error details:", error.message);
     return null;
   }
 };

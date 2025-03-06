@@ -45,76 +45,65 @@ const Game = () => {
             .slice(0, 30);
     }, [rankings, playerId]);
     
-    // 랭킹 데이터 로드
+    // 컴포넌트 마운트 시 랭킹 데이터 로드
     useEffect(() => {
         const loadRankings = async () => {
             try {
-                // 파이어베이스에서 랭킹 데이터 가져오기
-                console.log('파이어베이스에서 랭킹 데이터 로드 중...');
+                console.log('Loading ranking data from Firebase...');
                 const firebaseRankings = await getRankings(30);
-                console.log('파이어베이스에서 가져온 랭킹:', firebaseRankings);
+                console.log('Rankings from Firebase:', firebaseRankings);
                 
                 if (firebaseRankings && firebaseRankings.length > 0) {
                     setRankings(firebaseRankings);
                 } else {
-                    console.log('파이어베이스에서 랭킹을 가져오지 못했습니다.');
-                    setRankings([]);
+                    console.log('Could not retrieve rankings from Firebase.');
                 }
             } catch (error) {
-                console.error('랭킹 데이터 로드 중 오류 발생:', error);
-                setRankings([]);
+                console.error('Error loading ranking data:', error);
             }
         };
         
-        // 초기 로드
+        // 기존 데이터로 리더보드 표시
         loadRankings();
         
-        // 30초마다 랭킹 데이터 갱신
-        const rankingInterval = setInterval(loadRankings, 30000);
-        
         return () => {
-            clearInterval(rankingInterval);
+            // 클린업 코드
         };
     }, []);
     
-    // 랭킹 업데이트
-    const updateRankings = useCallback(async (newScore) => {
-        // 플레이어 ID가 비어있으면 처리하지 않음
-        if (!playerId.trim() || newScore <= 0) {
-            return;
-        }
-        
-        try {
-            // 파이어베이스에 랭킹 저장
-            console.log(`파이어베이스에 랭킹 저장 시도 - 플레이어: ${playerId}, 점수: ${newScore}`);
-            const result = await saveRanking(playerId, newScore);
-            console.log('파이어베이스 저장 결과:', result);
-            
-            // 파이어베이스에서 최신 랭킹을 가져옴
-            const updatedRankings = await getRankings(30);
-            console.log('파이어베이스에서 가져온 업데이트된 랭킹:', updatedRankings);
-            
-            if (updatedRankings && updatedRankings.length > 0) {
-                setRankings(updatedRankings);
+    // 게임 오버 시 점수 저장
+    const saveScore = async (playerId, newScore) => {
+        if (playerId.trim() && newScore > 0) {
+            try {
+                console.log(`Attempting to save ranking to Firebase - Player: ${playerId}, Score: ${newScore}`);
+                const result = await saveFirebaseRanking(playerId, newScore);
+                console.log('Firebase save result:', result);
+                
+                if (result && result.updated) {
+                    // 파이어베이스에서 최신 랭킹 가져오기
+                    const updatedRankings = await getRankings();
+                    console.log('Updated rankings from Firebase:', updatedRankings);
+                    
+                    if (updatedRankings && updatedRankings.length > 0) {
+                        setRankings(updatedRankings);
+                    }
+                    
+                    // 플레이어 순위 확인
+                    const playerRankInfo = await getPlayerRank(playerId);
+                    if (playerRankInfo) {
+                        console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                        setPlayerRank(playerRankInfo);
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving score:', error);
             }
-            
-            // 플레이어 순위 정보 가져오기
-            const playerRankInfo = await getPlayerRank(playerId);
-            if (playerRankInfo) {
-                console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
-                setPlayerRank(playerRankInfo);
-            }
-            
-            return updatedRankings;
-        } catch (error) {
-            console.error('랭킹 업데이트 중 오류 발생:', error);
-            return rankings;
         }
-    }, [rankings, playerId]);
+    };
     
     // 게임 정리 함수
     const cleanupGame = useCallback(() => {
-        console.log('게임 정리 중...');
+        console.log('Cleaning up game...');
         
         // 게임 엔진 정리
         if (runnerRef.current) {
@@ -392,91 +381,84 @@ const Game = () => {
     // 게임 초기화 함수
     const initGame = useCallback(() => {
         try {
-            console.log('게임 초기화 시작...');
+            console.log('Starting game initialization...');
             
-            // 이미 초기화되었으면 정리 먼저 수행
+            // 이미 초기화되어 있다면 재초기화하지 않음
             if (isInitialized) {
-                cleanupGame();
+                return;
             }
-            
-            // 캔버스 요소가 없으면 초기화 중단
+
             if (!canvasRef.current || !containerRef.current) {
-                console.log('캔버스 또는 컨테이너 요소가 준비되지 않았습니다. 초기화 연기...');
+                console.log('Canvas or container element is not ready. Initialization postponed...');
                 return;
             }
             
-            // 점수 초기화
-            setScore(0);
-            setGameOver(false);
+            // 게임 렌더러
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const width = containerRect.width;
+            const height = containerRect.height;
             
-            // 물리 엔진 생성
-            engineRef.current = Matter.Engine.create({
-                gravity: { x: 0, y: GRAVITY },
-                positionIterations: 12,
-                velocityIterations: 12,
-                constraintIterations: 4,
+            // 엔진 및 월드 설정
+            const engine = Matter.Engine.create({
                 enableSleeping: false,
-                timeScale: 0.9
+                gravity: { x: 0, y: GRAVITY }
             });
             
-            worldRef.current = engineRef.current.world;
+            const world = engine.world;
+            engineRef.current = engine;
+            worldRef.current = world;
             
-            // 캔버스 크기 설정
-            canvasRef.current.width = containerRef.current.clientWidth;
-            canvasRef.current.height = containerRef.current.clientHeight;
-            
-            // 렌더러 설정 - 안전장치 추가
             try {
-                console.log('렌더러 초기화 중...');
-                
-                renderRef.current = Matter.Render.create({
+                console.log('Initializing renderer...');
+                // 렌더러 설정
+                const render = Matter.Render.create({
                     canvas: canvasRef.current,
-                    engine: engineRef.current,
+                    engine: engine,
                     options: {
-                        width: canvasRef.current.width,
-                        height: canvasRef.current.height,
+                        width: width,
+                        height: height,
                         wireframes: false,
-                        background: '#f0f8ff'
+                        background: '#f0f8ff',
+                        pixelRatio: window.devicePixelRatio
                     }
                 });
+                Matter.Render.run(render);
                 
-                // 렌더러가 제대로 초기화되었는지 확인
-                if (!renderRef.current.canvas || !renderRef.current.context) {
-                    console.error('렌더러 캔버스 또는 컨텍스트가 초기화되지 않았습니다.');
-                    return;
-                }
+                // 러너 설정
+                const runner = Matter.Runner.create();
+                Matter.Runner.run(runner, engine);
                 
-                console.log('렌더러가 성공적으로 초기화되었습니다.');
+                renderRef.current = render;
+                runnerRef.current = runner;
                 
-                // 게임 실행
-                Matter.Render.run(renderRef.current);
-                runnerRef.current = Matter.Runner.create();
-                Matter.Runner.run(runnerRef.current, engineRef.current);
+                console.log('Renderer initialized successfully.');
                 
-                // 경계 생성
-                createBoundaries();
+                // 경계 설정
+                createBoundaries(world, width, height);
                 
-                // 기둥과 받침대 생성
-                createPillarAndPlatform();
+                // 초기 플랫폼 및 기둥 생성
+                createPillarAndPlatform(world, width, height);
                 
-                // 새 물체 생성
-                createNewObject();
+                // 첫 번째 객체 생성
+                createNewObject(world, width, height);
                 
                 // 마우스 컨트롤 설정
-                setupMouseControl();
+                setupMouseControl(engine, render);
                 
-                // 충돌 이벤트 감지
-                setupCollisionDetection();
+                // 충돌 감지 설정
+                setupCollisionDetection(engine);
                 
+                // 게임 초기화 완료 설정
                 setIsInitialized(true);
-                console.log('게임 초기화 완료!');
+                
+                console.log('Game initialization complete!');
             } catch (renderError) {
-                console.error('렌더러 초기화 오류:', renderError);
-                alert('게임 렌더러를 초기화하는 중 오류가 발생했습니다.');
+                console.error('Renderer initialization error:', renderError);
+                alert('Error initializing game renderer.');
             }
         } catch (error) {
             console.error('Game initialization error:', error);
-            alert('게임 초기화 중 오류가 발생했습니다: ' + error.message);
+            alert('Error during game initialization: ' + error.message);
         }
     }, [
         isInitialized, 
@@ -500,7 +482,7 @@ const Game = () => {
         // 지연 후 초기화 시도
         const initTimer = setTimeout(() => {
             if (canvasRef.current && containerRef.current && !isInitialized) {
-                console.log('useLayoutEffect에서 게임 초기화 시도...');
+                console.log('Attempting to initialize game from useLayoutEffect...');
                 initGame();
             }
         }, 300); // 300ms 지연으로 늘림
@@ -512,7 +494,7 @@ const Game = () => {
     
     // 이벤트 리스너 및 게임 정리
     useEffect(() => {
-        console.log('이벤트 리스너 설정 중...');
+        console.log('Setting up event listeners...');
         
         const handleKeyDown = (event) => {
             if (event.code === 'Space' && currentObjectRef.current && currentObjectRef.current.isStatic && !gameOver) {
@@ -557,7 +539,7 @@ const Game = () => {
         
         // 클린업 함수
         return () => {
-            console.log('이벤트 리스너 및 게임 정리 중...');
+            console.log('Cleaning up event listeners and game...');
             
             document.removeEventListener('keydown', handleKeyDown);
             if (currentCanvas) {
@@ -574,20 +556,20 @@ const Game = () => {
     useEffect(() => {
         // 게임이 종료된 경우에만 랭킹 업데이트
         if (gameOver && score > 0 && playerId.trim()) {
-            console.log('게임 오버, 파이어베이스 랭킹 업데이트 시작');
+            console.log('Game over, starting Firebase ranking update');
             
             // Firebase에 랭킹 저장
             const saveFbRanking = async () => {
                 try {
                     const result = await saveFirebaseRanking(playerId, score);
-                    console.log('Firebase 저장 결과:', result);
+                    console.log('Firebase save result:', result);
                     
                     if (result && result.updated) {
-                        console.log('Firebase 랭킹 저장 성공!');
+                        console.log('Firebase ranking saved successfully!');
                         
                         // 파이어베이스에서 최신 랭킹 가져오기
                         const updatedRankings = await getRankings();
-                        console.log('Firebase에서 가져온 업데이트된 랭킹:', updatedRankings);
+                        console.log('Updated rankings from Firebase:', updatedRankings);
                         
                         if (updatedRankings && updatedRankings.length > 0) {
                             setRankings(updatedRankings);
@@ -596,11 +578,11 @@ const Game = () => {
                         // 플레이어 순위 확인
                         const playerRankInfo = await getPlayerRank(playerId);
                         if (playerRankInfo) {
-                            console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                            console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
                             setPlayerRank(playerRankInfo);
                         }
                     } else if (result && result.reason === 'not-in-top-30') {
-                        console.log('TOP 30에 들어갈 수 없는 점수입니다.');
+                        console.log('Score is not high enough to make it to TOP 30.');
                         // TOP 30에 들어가지 못하는 경우 플레이어 랭킹 정보 설정
                         setPlayerRank({
                             rank: 31, // 30위 밖이라는 의미로 31로 설정
@@ -608,7 +590,7 @@ const Game = () => {
                         });
                     }
                 } catch (error) {
-                    console.error('Firebase 저장 중 오류 발생:', error);
+                    console.error('Error occurred while saving to Firebase:', error);
                 }
             };
             
@@ -619,7 +601,7 @@ const Game = () => {
     // 게임 시작 함수
     const startGame = () => {
         if (!playerId.trim()) {
-            alert('아이디를 입력해주세요!');
+            alert('Please enter your ID!');
             return;
         }
         
@@ -659,22 +641,22 @@ const Game = () => {
     }, [cleanupGame, initGame]);
     
     useEffect(() => {
-        console.log('Firestore DB 연결 상태:', !!db);
+        console.log('Firestore DB connection status:', !!db);
         
         // 테스트 문서 추가
         const testFirestore = async () => {
             try {
                 const docRef = await addDoc(collection(db, 'test'), {
-                    message: '테스트 메시지',
+                    message: 'Test message',
                     timestamp: new Date()
                 });
-                console.log('테스트 문서 추가 성공:', docRef.id);
-                alert('Firebase 연결 성공! 콘솔을 확인하세요.');
+                console.log('Test document added successfully:', docRef.id);
+                // alert('Firebase 연결 성공! 콘솔을 확인하세요.'); - 디버깅용 알람 제거
             } catch (e) {
-                console.error('테스트 문서 추가 실패:', e);
-                console.error('오류 코드:', e.code);
-                console.error('오류 세부 정보:', e.details);
-                alert('Firebase 연결 실패: ' + e.message + '\n\n자세한 내용은 콘솔을 확인하세요.');
+                console.error('Failed to add test document:', e);
+                console.error('Error code:', e.code);
+                console.error('Error details:', e.details);
+                alert('Firebase connection failed: ' + e.message + '\n\nCheck console for details.');
             }
         };
         
@@ -683,29 +665,29 @@ const Game = () => {
     
     // DB 연결 상태 확인
     useEffect(() => {
-        console.log('Firebase 초기화 상태:', initialized);
-        console.log('Firebase DB 연결 상태:', !!db);
+        console.log('Firebase initialization status:', initialized);
+        console.log('Firebase DB connection status:', !!db);
         
         if (!initialized || !db) {
-            console.warn('Firebase가 초기화되지 않았습니다. 랭킹 저장 기능이 작동하지 않을 수 있습니다.');
+            console.warn('Firebase is not initialized. Ranking features may not work properly.');
         }
     }, []);
     
     // Firebase에 랭킹 저장하는 함수
     const saveFirebaseRanking = async (playerId, score) => {
         try {
-            console.log(`Firebase 랭킹 저장 시도 - 플레이어: ${playerId}, 점수: ${score}`);
-            console.log('Firebase 초기화 상태:', initialized);
-            console.log('Firebase DB 연결 상태:', !!db);
+            console.log(`Attempting to save ranking to Firebase - Player: ${playerId}, Score: ${score}`);
+            console.log('Firebase initialization status:', initialized);
+            console.log('Firebase DB connection status:', !!db);
             
             if (!initialized || !db) {
-                console.error('Firebase가 초기화되지 않았습니다. 랭킹을 저장할 수 없습니다.');
-                return { error: '초기화 오류' };
+                console.error('Firebase is not initialized. Cannot save ranking.');
+                return { error: 'Initialization error' };
             }
             
             if (!playerId || score <= 0) {
-                console.log('유효하지 않은 플레이어 ID 또는 점수');
-                return { error: '유효하지 않은 데이터' };
+                console.log('Invalid player ID or score');
+                return { error: 'Invalid data' };
             }
             
             // 현재 TOP 30 랭킹 데이터 가져오기
@@ -733,24 +715,24 @@ const Game = () => {
             
             // TOP 30에 들어갈 수 없으면 저장하지 않음
             if (!canEnterTop30) {
-                console.log('TOP 30에 들어갈 수 없는 점수입니다. 파이어베이스에 저장하지 않습니다.');
+                console.log('Score is not high enough to make it to TOP 30. Not saving to Firebase.');
                 return { updated: false, reason: 'not-in-top-30' };
             }
             
             // TOP 30에 들어갈 수 있으면 저장 진행
             const result = await saveRanking(playerId, score);
-            console.log('Firebase 저장 결과:', result);
+            console.log('Firebase save result:', result);
             
             if (result.updated) {
                 if (result.newHighScore) {
-                    console.log('새로운 최고 점수가 Firebase에 저장되었습니다!');
+                    console.log('New high score saved to Firebase!');
                 } else if (result.newRecord) {
-                    console.log('새로운 플레이어 기록이 Firebase에 저장되었습니다!');
+                    console.log('New player record saved to Firebase!');
                 }
                 
                 // 전체 랭킹 업데이트
                 const updatedRankings = await getRankings();
-                console.log('Firebase에서 가져온 업데이트된 랭킹:', updatedRankings);
+                console.log('Updated rankings from Firebase:', updatedRankings);
                 if (updatedRankings && updatedRankings.length > 0) {
                     setRankings(updatedRankings);
                 }
@@ -758,24 +740,24 @@ const Game = () => {
                 // 플레이어 순위 확인
                 const playerRankInfo = await getPlayerRank(playerId);
                 if (playerRankInfo) {
-                    console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                    console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
                     setPlayerRank(playerRankInfo);
                 }
             } else {
-                console.log('기존 최고 점수가 더 높아 업데이트되지 않았습니다.');
+                console.log('Existing high score is higher, no update needed.');
                 
-                // 현재 순위 확인
+                // 순위 정보만 업데이트
                 const playerRankInfo = await getPlayerRank(playerId);
                 if (playerRankInfo) {
-                    console.log(`현재 순위: ${playerRankInfo.rank}/${playerRankInfo.total}`);
+                    console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
                     setPlayerRank(playerRankInfo);
                 }
             }
             
             return result;
         } catch (error) {
-            console.error('Firebase 랭킹 저장 중 오류 발생:', error);
-            console.error('오류 세부 정보:', error.message);
+            console.error('Error occurred while saving to Firebase:', error);
+            console.error('Error details:', error.message);
             // 오류가 발생해도 게임은 계속 진행
             return { error: error.message };
         }
@@ -785,11 +767,11 @@ const Game = () => {
         <div className="game-container" ref={containerRef}>
             {!gameStarted ? (
                 <div className="start-screen">
-                    <h1>높이 쌓기 게임</h1>
+                    <h1>Stack Tower Game</h1>
                     <div className="input-container">
                         <input 
                             type="text" 
-                            placeholder="아이디를 입력하세요" 
+                            placeholder="Enter your ID" 
                             value={playerId}
                             onChange={(e) => setPlayerId(e.target.value)}
                             maxLength={15}
@@ -798,30 +780,30 @@ const Game = () => {
                             className="start-btn"
                             onClick={startGame}
                         >
-                            시작하기
+                            Start Game
                         </button>
                     </div>
                 </div>
             ) : (
                 <>
                     <canvas ref={canvasRef} />
-                    <div className="score">점수: {score}</div>
+                    <div className="score">Score: {score}</div>
                     <button 
                         className="drop-btn" 
                         onClick={dropObject}
                         disabled={gameOver || !currentObjectRef.current || !currentObjectRef.current.isStatic}
                     >
-                        떨어뜨리기
+                        Drop
                     </button>
                     
                     {/* 랭킹 보드 */}
                     <div className="ranking-board">
-                        <h2>랭킹 TOP 30</h2>
+                        <h2>TOP 30 Ranking</h2>
                         {console.log('Rendering ranking board')}
                         <div className="ranking-list">
                             {displayRankings.length === 0 ? (
                                 <div className="no-rankings">
-                                    아직 랭킹 정보가 없습니다!
+                                    No ranking data available!
                                 </div>
                             ) : (
                                 displayRankings.map((rank, index) => (
@@ -840,24 +822,24 @@ const Game = () => {
                     
                     {gameOver && (
                         <div className="game-over">
-                            <h1>게임 오버!</h1>
-                            <p className="player-id">플레이어: {playerId}</p>
-                            <p className="final-score">최종 점수: <span className="highlight">{score}</span></p>
+                            <h1>Game Over!</h1>
+                            <p className="player-id">Player: {playerId}</p>
+                            <p className="final-score">Final Score: <span className="highlight">{score}</span></p>
                             {playerRank && playerRank.rank <= 30 && (
                                 <p className="player-rank">
-                                    현재 순위: <span className="highlight">{playerRank.rank}</span>/{playerRank.total}
+                                    Current Rank: <span className="highlight">{playerRank.rank}</span>/{playerRank.total}
                                 </p>
                             )}
                             {playerRank && playerRank.rank > 30 && (
                                 <p className="player-rank">
-                                    TOP 30에 들어가지 못했습니다.
+                                    You didn't make it to TOP 30.
                                 </p>
                             )}
                             <button 
                                 className="restart-btn" 
                                 onClick={restartGame}
                             >
-                                다시 시작
+                                Play Again
                             </button>
                         </div>
                     )}

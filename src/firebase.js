@@ -26,33 +26,33 @@ let db;
 let analytics;
 
 try {
-  console.log('Firebase 초기화 시작...');
+  console.log('Starting Firebase initialization...');
   app = initializeApp(firebaseConfig);
   
-  console.log('Firebase 앱 초기화 성공, Firestore 초기화 시작...');
+  console.log('Firebase app initialized successfully, initializing Firestore...');
   // Initialize Firestore
   db = getFirestore(app);
   
-  console.log('Firestore 초기화 성공, Analytics 초기화 시작...');
+  console.log('Firestore initialized successfully, initializing Analytics...');
   // Analytics는 브라우저 환경에서만 초기화
   if (typeof window !== 'undefined') {
     analytics = getAnalytics(app);
-    console.log('Analytics 초기화 성공');
+    console.log('Analytics initialized successfully');
   }
   
   initialized = true;
-  console.log("Firebase 초기화 완료!");
+  console.log("Firebase initialization complete!");
 } catch (error) {
-  console.error("Firebase 초기화 오류:", error);
-  console.error("오류 메시지:", error.message);
-  console.error("오류 스택:", error.stack);
+  console.error("Firebase initialization error:", error);
+  console.error("Error message:", error.message);
+  console.error("Error stack:", error.stack);
   initialized = false;
 }
 
 // 개발 환경에서 Firestore 에뮬레이터 연결 (선택 사항)
 // if (process.env.NODE_ENV === 'development') {
 //   connectFirestoreEmulator(db, 'localhost', 8080);
-//   console.log('Firestore 에뮬레이터에 연결됨');
+//   console.log('Connected to Firestore emulator');
 // }
 
 export { db, initialized };
