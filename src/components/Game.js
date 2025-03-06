@@ -816,10 +816,10 @@ const Game = () => {
                     
                     {/* 랭킹 보드 */}
                     <div className="ranking-board">
-                        <h2>TOP 30 Ranking</h2>
                         <div className="online-users">
-                            <span className="online-icon">👥</span> {onlineUsers} 명 접속중
+                            <span className="online-icon">👥</span> {onlineUsers} players
                         </div>
+                        <h2>TOP 30 Ranking</h2>
                         {console.log('Rendering ranking board')}
                         <div className="ranking-list">
                             {displayRankings.length === 0 ? (
