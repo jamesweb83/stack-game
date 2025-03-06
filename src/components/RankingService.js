@@ -172,7 +172,7 @@ export const getPlayerRank = async (playerId) => {
     if (playerIndex !== -1) {
       const rankInfo = {
         rank: playerIndex + 1,
-        total: rankings.length
+        total: 30 // 항상 30으로 고정
       };
       console.log(`Player ranking info:`, rankInfo);
       return rankInfo;
