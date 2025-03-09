@@ -5,6 +5,8 @@ import { db, initialized } from '../firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { saveRanking, getRankings, getPlayerRank } from './RankingService';
 import { initOnlineUsers, subscribeToOnlineUsers, unsubscribeFromOnlineUsers } from '../firebase';
+import StartScreen from './StartScreen';
+import MatchmakingScreen from './multiplayer/MatchmakingScreen';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -18,6 +20,10 @@ const Game = () => {
     const [playerRank, setPlayerRank] = useState(null);
     const [topScore, setTopScore] = useState(0);
     const [onlineUsers, setOnlineUsers] = useState(0);
+    const [gameMode, setGameMode] = useState(null); // 'single' 또는 'multiplayer'
+    const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [matchData, setMatchData] = useState(null);
+    const [showMatchSuccess, setShowMatchSuccess] = useState(false);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -37,9 +43,6 @@ const Game = () => {
     
     // useMemo로 objectShapes 메모이제이션 - 사각형만 사용
     const objectShapes = useMemo(() => ['rectangle'], []);
-    
-    // 기울기 종료 조건 제거로 인해 불필요
-    // const platformAngleToleranceRef = useRef(0.3); // 균형 허용 각도
     
     // 표시할 랭킹 목록 메모이제이션
     const displayRankings = useMemo(() => {
@@ -122,7 +125,7 @@ const Game = () => {
     
     // 게임 정리 함수
     const cleanupGame = useCallback(() => {
-        console.log('Cleaning up game...');
+        console.log('Cleaning up game engine...');
         
         // 게임 엔진 정리
         if (runnerRef.current) {
@@ -466,7 +469,6 @@ const Game = () => {
         }
     }, [
         isInitialized, 
-        cleanupGame, 
         GRAVITY, 
         createBoundaries, 
         createPillarAndPlatform, 
@@ -603,16 +605,49 @@ const Game = () => {
     }, [gameOver, score, playerId]);
     
     // 게임 시작 함수
-    const startGame = () => {
+    const startSinglePlayerGame = () => {
         if (!playerId.trim()) {
             alert('Please enter your ID!');
             return;
         }
         
+        setGameMode('single');
         setGameStarted(true);
         setScore(0);
         setGameOver(false);
-    }
+    };
+    
+    // 멀티플레이어 매칭 시작
+    const startMultiplayerGame = () => {
+        if (!playerId.trim()) {
+            alert('Please enter your ID!');
+            return;
+        }
+        
+        setGameMode('multiplayer');
+        setIsMatchmaking(true);
+    };
+    
+    // 매칭 취소
+    const cancelMatchmaking = () => {
+        setIsMatchmaking(false);
+        setGameMode(null);
+    };
+    
+    // 매칭 성공 처리
+    const handleMatchFound = (gameData) => {
+        setMatchData(gameData);
+        setIsMatchmaking(false);
+        setGameStarted(true);
+        setScore(0);
+        setGameOver(false);
+        
+        // 매칭 성공 메시지 표시
+        setShowMatchSuccess(true);
+        setTimeout(() => {
+            setShowMatchSuccess(false);
+        }, 3000); // 3초 후 메시지 숨김
+    };
     
     // 게임 재시작 함수
     const restartGame = useCallback(() => {
@@ -642,7 +677,7 @@ const Game = () => {
         setTimeout(() => {
             initGame();
         }, 300);
-    }, [cleanupGame, initGame]);
+    }, [cleanupGame, initGame, getRankings]);
     
     useEffect(() => {
         console.log('Firestore DB connection status:', !!db);
@@ -770,31 +805,40 @@ const Game = () => {
     return (
         <div className="game-container" ref={containerRef}>
             {!gameStarted ? (
-                <div className="start-screen">
-                    <h1>Stack Tower Game</h1>
-                    <div className="input-container">
-                        <input 
-                            type="text" 
-                            placeholder="Enter your ID" 
-                            value={playerId}
-                            onChange={(e) => setPlayerId(e.target.value)}
-                            maxLength={15}
+                <>
+                    <StartScreen 
+                        playerId={playerId}
+                        setPlayerId={setPlayerId}
+                        onStartSinglePlayer={startSinglePlayerGame}
+                        onStartMultiplayer={startMultiplayerGame}
+                    />
+                    
+                    {isMatchmaking && (
+                        <MatchmakingScreen 
+                            playerId={playerId}
+                            onMatchFound={handleMatchFound}
+                            onCancel={cancelMatchmaking}
                         />
-                        <button 
-                            className="start-btn"
-                            onClick={startGame}
-                        >
-                            Start Game
-                        </button>
-                    </div>
-                </div>
+                    )}
+                </>
             ) : (
                 <>
                     <canvas ref={canvasRef} />
                     <div className="score">
                         <span>Player: {playerId}</span>
                         <span>Score: {score}</span>
+                        {gameMode === 'multiplayer' && matchData && (
+                            <span className="game-mode">Multiplayer Mode</span>
+                        )}
                     </div>
+                    
+                    {/* 매칭 성공 메시지 */}
+                    {showMatchSuccess && gameMode === 'multiplayer' && (
+                        <div className="match-success-message">
+                            매칭 성공!
+                        </div>
+                    )}
+                    
                     <button 
                         className="drop-btn" 
                         onClick={dropObject}

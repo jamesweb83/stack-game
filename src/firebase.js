@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator, doc, setDoc, onSnapshot, getDoc, updateDoc, increment } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
+import { getDatabase } from "firebase/database";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -14,7 +15,8 @@ const firebaseConfig = {
   storageBucket: "stack-game-rankings.firebasestorage.app",
   messagingSenderId: "660815643253",
   appId: "1:660815643253:web:1263c275bc5d29b3b16e3c",
-  measurementId: "G-02E45Q87H4"
+  measurementId: "G-02E45Q87H4",
+  databaseURL: "https://stack-game-rankings-default-rtdb.firebaseio.com",
 };
 
 // Firebase 초기화 상태 플래그
@@ -24,6 +26,7 @@ let initialized = false;
 let app;
 let db;
 let analytics;
+let realtimeDB;
 let onlineUsersUnsubscribe = null;
 
 try {
@@ -34,7 +37,12 @@ try {
   // Initialize Firestore
   db = getFirestore(app);
   
-  console.log('Firestore initialized successfully, initializing Analytics...');
+  console.log('Firestore initialized successfully, initializing Realtime Database...');
+  // Initialize Realtime Database
+  realtimeDB = getDatabase(app);
+  console.log('Realtime Database initialized successfully');
+  
+  console.log('Initializing Analytics...');
   // Analytics는 브라우저 환경에서만 초기화
   if (typeof window !== 'undefined') {
     analytics = getAnalytics(app);
@@ -129,4 +137,4 @@ export const unsubscribeFromOnlineUsers = () => {
 //   console.log('Connected to Firestore emulator');
 // }
 
-export { db, initialized };
+export { db, realtimeDB, initialized };

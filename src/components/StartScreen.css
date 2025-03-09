@@ -1,0 +1,94 @@
+.start-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 20px;
+}
+
+.start-screen h1 {
+    font-size: 36px;
+    margin-bottom: 30px;
+    color: #333;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.input-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 400px;
+}
+
+.input-container input {
+    padding: 12px 15px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    text-align: center;
+    transition: border-color 0.3s;
+}
+
+.input-container input:focus {
+    border-color: #6b9bff;
+    outline: none;
+}
+
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.start-btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.single-player-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.single-player-btn:hover {
+    background-color: #3e8e41;
+}
+
+.multiplayer-btn {
+    background-color: #2196F3;
+    color: white;
+}
+
+.multiplayer-btn:hover {
+    background-color: #0b7dda;
+}
+
+.start-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .start-screen h1 {
+        font-size: 28px;
+    }
+    
+    .input-container input {
+        padding: 10px;
+        font-size: 14px;
+    }
+    
+    .start-btn {
+        padding: 10px;
+        font-size: 14px;
+    }
+} 
