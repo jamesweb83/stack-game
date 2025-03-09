@@ -5,8 +5,6 @@ import { db, initialized } from '../firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { saveRanking, getRankings, getPlayerRank } from './RankingService';
 import { initOnlineUsers, subscribeToOnlineUsers, unsubscribeFromOnlineUsers } from '../firebase';
-import StartScreen from './StartScreen';
-import MatchmakingScreen from './multiplayer/MatchmakingScreen';
 
 const Game = () => {
     const canvasRef = useRef(null);
@@ -20,10 +18,6 @@ const Game = () => {
     const [playerRank, setPlayerRank] = useState(null);
     const [topScore, setTopScore] = useState(0);
     const [onlineUsers, setOnlineUsers] = useState(0);
-    const [gameMode, setGameMode] = useState(null); // 'single' 또는 'multiplayer'
-    const [isMatchmaking, setIsMatchmaking] = useState(false);
-    const [matchData, setMatchData] = useState(null);
-    const [showMatchSuccess, setShowMatchSuccess] = useState(false);
     
     // 게임 엔진과 관련 객체 참조
     const engineRef = useRef(null);
@@ -102,8 +96,10 @@ const Game = () => {
                 console.log('Firebase save result:', result);
                 
                 if (result && result.updated) {
+                    console.log('Firebase ranking saved successfully!');
+                    
                     // 파이어베이스에서 최신 랭킹 가져오기
-                    const updatedRankings = await getRankings();
+                    const updatedRankings = await getRankings(30);
                     console.log('Updated rankings from Firebase:', updatedRankings);
                     
                     if (updatedRankings && updatedRankings.length > 0) {
@@ -116,16 +112,24 @@ const Game = () => {
                         console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
                         setPlayerRank(playerRankInfo);
                     }
+                } else if (result && result.reason === 'not-in-top-30') {
+                    console.log('Score is not high enough to make it to TOP 30.');
+                    // TOP 30에 들어가지 못하는 경우 플레이어 랭킹 정보 설정
+                    setPlayerRank({
+                        rank: 31, // 30위 밖이라는 의미로 31로 설정
+                        total: 30
+                    });
                 }
             } catch (error) {
-                console.error('Error saving score:', error);
+                console.error('Error saving to Firebase:', error);
+                console.error('Error details:', error.message);
             }
         }
     };
     
     // 게임 정리 함수
     const cleanupGame = useCallback(() => {
-        console.log('Cleaning up game engine...');
+        console.log('Cleaning up game...');
         
         // 게임 엔진 정리
         if (runnerRef.current) {
@@ -469,6 +473,7 @@ const Game = () => {
         }
     }, [
         isInitialized, 
+        cleanupGame, 
         GRAVITY, 
         createBoundaries, 
         createPillarAndPlatform, 
@@ -605,49 +610,16 @@ const Game = () => {
     }, [gameOver, score, playerId]);
     
     // 게임 시작 함수
-    const startSinglePlayerGame = () => {
+    const startGame = () => {
         if (!playerId.trim()) {
             alert('Please enter your ID!');
             return;
         }
         
-        setGameMode('single');
         setGameStarted(true);
         setScore(0);
         setGameOver(false);
-    };
-    
-    // 멀티플레이어 매칭 시작
-    const startMultiplayerGame = () => {
-        if (!playerId.trim()) {
-            alert('Please enter your ID!');
-            return;
-        }
-        
-        setGameMode('multiplayer');
-        setIsMatchmaking(true);
-    };
-    
-    // 매칭 취소
-    const cancelMatchmaking = () => {
-        setIsMatchmaking(false);
-        setGameMode(null);
-    };
-    
-    // 매칭 성공 처리
-    const handleMatchFound = (gameData) => {
-        setMatchData(gameData);
-        setIsMatchmaking(false);
-        setGameStarted(true);
-        setScore(0);
-        setGameOver(false);
-        
-        // 매칭 성공 메시지 표시
-        setShowMatchSuccess(true);
-        setTimeout(() => {
-            setShowMatchSuccess(false);
-        }, 3000); // 3초 후 메시지 숨김
-    };
+    }
     
     // 게임 재시작 함수
     const restartGame = useCallback(() => {
@@ -677,7 +649,7 @@ const Game = () => {
         setTimeout(() => {
             initGame();
         }, 300);
-    }, [cleanupGame, initGame, getRankings]);
+    }, [cleanupGame, initGame]);
     
     useEffect(() => {
         console.log('Firestore DB connection status:', !!db);
@@ -747,41 +719,23 @@ const Game = () => {
                     canEnterTop30 = score > existingPlayerRank.score;
                 } else {
                     // 새 플레이어는 30위 점수보다 높아야 진입 가능
-                    const lowestRankScore = currentRankings[currentRankings.length - 1].score;
-                    canEnterTop30 = score > lowestRankScore;
+                    const lowestRank = currentRankings.sort((a, b) => a.score - b.score)[0];
+                    canEnterTop30 = score > lowestRank.score;
                 }
             }
             
-            // TOP 30에 들어갈 수 없으면 저장하지 않음
+            // TOP 30에 들어갈 수 없으면 저장하지 않고 종료
             if (!canEnterTop30) {
-                console.log('Score is not high enough to make it to TOP 30. Not saving to Firebase.');
+                console.log('Score is not high enough to make it to TOP 30');
                 return { updated: false, reason: 'not-in-top-30' };
             }
             
-            // TOP 30에 들어갈 수 있으면 저장 진행
+            // 랭킹 저장
             const result = await saveRanking(playerId, score);
-            console.log('Firebase save result:', result);
             
-            if (result.updated) {
-                if (result.newHighScore) {
-                    console.log('New high score saved to Firebase!');
-                } else if (result.newRecord) {
-                    console.log('New player record saved to Firebase!');
-                }
-                
-                // 전체 랭킹 업데이트
-                const updatedRankings = await getRankings();
-                console.log('Updated rankings from Firebase:', updatedRankings);
-                if (updatedRankings && updatedRankings.length > 0) {
-                    setRankings(updatedRankings);
-                }
-                
-                // 플레이어 순위 확인
-                const playerRankInfo = await getPlayerRank(playerId);
-                if (playerRankInfo) {
-                    console.log(`Current rank: ${playerRankInfo.rank}/${playerRankInfo.total}`);
-                    setPlayerRank(playerRankInfo);
-                }
+            if (result.newHighScore) {
+                console.log('New high score saved!');
+                setTopScore(score);
             } else {
                 console.log('Existing high score is higher, no update needed.');
                 
@@ -805,40 +759,31 @@ const Game = () => {
     return (
         <div className="game-container" ref={containerRef}>
             {!gameStarted ? (
-                <>
-                    <StartScreen 
-                        playerId={playerId}
-                        setPlayerId={setPlayerId}
-                        onStartSinglePlayer={startSinglePlayerGame}
-                        onStartMultiplayer={startMultiplayerGame}
-                    />
-                    
-                    {isMatchmaking && (
-                        <MatchmakingScreen 
-                            playerId={playerId}
-                            onMatchFound={handleMatchFound}
-                            onCancel={cancelMatchmaking}
+                <div className="start-screen">
+                    <h1>Stack Tower Game</h1>
+                    <div className="input-container">
+                        <input 
+                            type="text" 
+                            placeholder="Enter your ID" 
+                            value={playerId}
+                            onChange={(e) => setPlayerId(e.target.value)}
+                            maxLength={15}
                         />
-                    )}
-                </>
+                        <button 
+                            className="start-btn"
+                            onClick={startGame}
+                        >
+                            Start Game
+                        </button>
+                    </div>
+                </div>
             ) : (
                 <>
                     <canvas ref={canvasRef} />
                     <div className="score">
                         <span>Player: {playerId}</span>
                         <span>Score: {score}</span>
-                        {gameMode === 'multiplayer' && matchData && (
-                            <span className="game-mode">Multiplayer Mode</span>
-                        )}
                     </div>
-                    
-                    {/* 매칭 성공 메시지 */}
-                    {showMatchSuccess && gameMode === 'multiplayer' && (
-                        <div className="match-success-message">
-                            매칭 성공!
-                        </div>
-                    )}
-                    
                     <button 
                         className="drop-btn" 
                         onClick={dropObject}
